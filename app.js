@@ -7,111 +7,228 @@ const app = {
     editingBookmark: null,
 
     async init() {
-        await bookmarkStore.ensureReady();
-        await autoTagger.loadRules();
-        await initDefaultTopics();
-        await notionExporter.init();
-        await obsidianExporter.init();
+        console.log('Iniciando Bookmark Manager...');
         
-        this.bookmarks = await bookmarkStore.getAllBookmarks();
-        this.topics = await bookmarkStore.getAllTopics();
-        
-        this.setupEventListeners();
-        this.render();
-        
-        console.log('Bookmark Manager initialized');
+        try {
+            await bookmarkStore.ensureReady();
+            await autoTagger.loadRules();
+            await notionExporter.init();
+            await obsidianExporter.init();
+            
+            this.bookmarks = await bookmarkStore.getAllBookmarks();
+            this.topics = await bookmarkStore.getAllTopics();
+            
+            this.setupEventListeners();
+            this.render();
+            
+            console.log('Bookmark Manager iniciado correctamente');
+        } catch (error) {
+            console.error('Error al iniciar:', error);
+        }
     },
 
     setupEventListeners() {
         // Search
-        document.getElementById('searchInput').addEventListener('input', (e) => {
-            this.currentFilter.search = e.target.value.toLowerCase();
-            this.renderBookmarks();
-        });
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                this.currentFilter.search = e.target.value.toLowerCase();
+                this.renderBookmarks();
+            });
+        }
 
         // Header buttons
-        document.getElementById('importBtn').addEventListener('click', () => this.showModal('importModal'));
-        document.getElementById('emptyImportBtn')?.addEventListener('click', () => this.showModal('importModal'));
-        document.getElementById('exportBtn').addEventListener('click', () => this.exportJSON());
-        document.getElementById('settingsBtn').addEventListener('click', () => this.showSettings());
+        const importBtn = document.getElementById('importBtn');
+        if (importBtn) {
+            importBtn.addEventListener('click', () => this.showModal('importModal'));
+        }
+
+        const emptyImportBtn = document.getElementById('emptyImportBtn');
+        if (emptyImportBtn) {
+            emptyImportBtn.addEventListener('click', () => this.showModal('importModal'));
+        }
+
+        const exportBtn = document.getElementById('exportBtn');
+        if (exportBtn) {
+            exportBtn.addEventListener('click', () => this.exportJSON());
+        }
+
+        const settingsBtn = document.getElementById('settingsBtn');
+        if (settingsBtn) {
+            settingsBtn.addEventListener('click', () => this.showSettings());
+        }
 
         // Sync dropdown
-        document.getElementById('notionBtn').addEventListener('click', () => this.syncToNotion());
-        document.getElementById('obsidianBtn').addEventListener('click', () => this.syncToObsidian());
+        const notionBtn = document.getElementById('notionBtn');
+        if (notionBtn) {
+            notionBtn.addEventListener('click', () => this.syncToNotion());
+        }
+
+        const obsidianBtn = document.getElementById('obsidianBtn');
+        if (obsidianBtn) {
+            obsidianBtn.addEventListener('click', () => this.syncToObsidian());
+        }
 
         // Import options
-        document.getElementById('importFile').addEventListener('click', () => this.showImportArea('file'));
-        document.getElementById('importPaste').addEventListener('click', () => this.showImportArea('paste'));
-        document.getElementById('importJson').addEventListener('click', () => this.showImportArea('json'));
+        const importFile = document.getElementById('importFile');
+        if (importFile) {
+            importFile.addEventListener('click', () => this.showImportArea('file'));
+        }
 
-        // File input and drop zone
+        const importPaste = document.getElementById('importPaste');
+        if (importPaste) {
+            importPaste.addEventListener('click', () => this.showImportArea('paste'));
+        }
+
+        const importJson = document.getElementById('importJson');
+        if (importJson) {
+            importJson.addEventListener('click', () => this.showImportArea('json'));
+        }
+
+        // File input
         const fileInput = document.getElementById('fileInput');
-        const dropZone = document.getElementById('dropZone');
+        if (fileInput) {
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files && e.target.files[0]) {
+                    this.handleFileImport(e.target.files[0]);
+                }
+            });
+        }
 
-        fileInput.addEventListener('change', (e) => this.handleFileImport(e.target.files[0]));
-        dropZone.addEventListener('click', () => fileInput.click());
-        dropZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropZone.classList.add('dragover');
-        });
-        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-        dropZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropZone.classList.remove('dragover');
-            const file = e.dataTransfer.files[0];
-            if (file) this.handleFileImport(file);
-        });
+        // Drop zone
+        const dropZone = document.getElementById('dropZone');
+        if (dropZone) {
+            dropZone.addEventListener('click', () => {
+                const fi = document.getElementById('fileInput');
+                if (fi) fi.click();
+            });
+            
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('dragover');
+            });
+            
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('dragover');
+            });
+            
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    this.handleFileImport(e.dataTransfer.files[0]);
+                }
+            });
+        }
 
         // URL paste
-        document.getElementById('urlInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.addBookmarkFromUrl(e.target.value);
-        });
+        const urlInput = document.getElementById('urlInput');
+        if (urlInput) {
+            urlInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.addBookmarkFromUrl(e.target.value);
+                }
+            });
+        }
 
         // View tabs
         document.querySelectorAll('.view-tab').forEach(tab => {
-            tab.addEventListener('click', () => this.switchView(tab.dataset.view));
+            tab.addEventListener('click', () => {
+                if (tab.dataset.view) {
+                    this.switchView(tab.dataset.view);
+                }
+            });
         });
 
         // Sort
-        document.getElementById('sortSelect').addEventListener('change', () => this.renderBookmarks());
+        const sortSelect = document.getElementById('sortSelect');
+        if (sortSelect) {
+            sortSelect.addEventListener('change', () => this.renderBookmarks());
+        }
 
-        // Type filters
+        // Type filters in sidebar
         document.querySelectorAll('#typeFilters .sidebar-item').forEach(item => {
-            item.addEventListener('click', () => this.filterByType(item.dataset.type));
+            item.addEventListener('click', () => {
+                if (item.dataset.type) {
+                    this.filterByType(item.dataset.type);
+                }
+            });
         });
 
         // Modal close buttons
         document.querySelectorAll('.modal-close').forEach(btn => {
-            btn.addEventListener('click', () => this.closeModal(btn.dataset.modal));
+            btn.addEventListener('click', () => {
+                const modal = btn.closest('.modal');
+                if (modal) {
+                    this.closeModal(modal.id);
+                }
+            });
         });
 
+        // Cancel buttons in modals
         document.querySelectorAll('[data-modal]').forEach(btn => {
-            if (!btn.classList.contains('modal-close')) {
-                btn.addEventListener('click', () => this.closeModal(btn.dataset.modal));
-            }
+            btn.addEventListener('click', () => {
+                const modalId = btn.dataset.modal;
+                if (modalId) {
+                    this.closeModal(modalId);
+                }
+            });
         });
 
-        // Save bookmark
-        document.getElementById('saveBookmark').addEventListener('click', () => this.saveBookmarkForm());
+        // Save bookmark button
+        const saveBookmark = document.getElementById('saveBookmark');
+        if (saveBookmark) {
+            saveBookmark.addEventListener('click', () => this.saveBookmarkForm());
+        }
 
         // Detail panel
-        document.getElementById('closeDetail').addEventListener('click', () => this.hideDetailPanel());
-        document.getElementById('editBookmark').addEventListener('click', () => this.editSelectedBookmark());
-        document.getElementById('deleteBookmark').addEventListener('click', () => this.deleteSelectedBookmark());
+        const closeDetail = document.getElementById('closeDetail');
+        if (closeDetail) {
+            closeDetail.addEventListener('click', () => this.hideDetailPanel());
+        }
+
+        const editBookmark = document.getElementById('editBookmark');
+        if (editBookmark) {
+            editBookmark.addEventListener('click', () => this.editSelectedBookmark());
+        }
+
+        const deleteBookmark = document.getElementById('deleteBookmark');
+        if (deleteBookmark) {
+            deleteBookmark.addEventListener('click', () => this.deleteSelectedBookmark());
+        }
 
         // Notes auto-save
-        document.getElementById('detailNotes').addEventListener('blur', () => this.saveNotes());
+        const detailNotes = document.getElementById('detailNotes');
+        if (detailNotes) {
+            detailNotes.addEventListener('blur', () => this.saveNotes());
+        }
 
-        // Settings modal
-        document.getElementById('testNotion').addEventListener('click', () => this.testNotionConnection());
-        document.getElementById('addRule').addEventListener('click', () => this.addRule());
-        document.getElementById('addTopic').addEventListener('click', () => this.addTopic());
+        // Settings
+        const testNotion = document.getElementById('testNotion');
+        if (testNotion) {
+            testNotion.addEventListener('click', () => this.testNotionConnection());
+        }
 
-        // Context menu
-        document.addEventListener('click', () => this.hideContextMenu());
-        document.querySelectorAll('.context-item').forEach(item => {
-            item.addEventListener('click', () => this.handleContextAction(item.dataset.action));
-        });
+        const addRule = document.getElementById('addRule');
+        if (addRule) {
+            addRule.addEventListener('click', () => this.addRule());
+        }
+
+        const addTopic = document.getElementById('addTopic');
+        if (addTopic) {
+            addTopic.addEventListener('click', () => this.addTopic());
+        }
+
+        // Save settings when closing settings modal
+        const settingsModal = document.getElementById('settingsModal');
+        if (settingsModal) {
+            const observer = new MutationObserver(() => {
+                if (settingsModal.classList.contains('hidden')) {
+                    this.saveSettings();
+                }
+            });
+            observer.observe(settingsModal, { attributes: true, attributeFilter: ['class'] });
+        }
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
@@ -122,7 +239,8 @@ const app = {
             }
             if (e.ctrlKey && e.key === 'f') {
                 e.preventDefault();
-                document.getElementById('searchInput').focus();
+                const si = document.getElementById('searchInput');
+                if (si) si.focus();
             }
             if (e.ctrlKey && e.key === 'n') {
                 e.preventDefault();
@@ -154,27 +272,22 @@ const app = {
 
     getFilteredBookmarks() {
         return this.bookmarks.filter(bm => {
-            // Type filter
             if (this.currentFilter.type !== 'all' && bm.type !== this.currentFilter.type) {
                 return false;
             }
             
-            // Tag filter
             if (this.currentFilter.tag && !bm.tags?.includes(this.currentFilter.tag)) {
                 return false;
             }
             
-            // Topic filter
             if (this.currentFilter.topic && !bm.topics?.some(t => t.includes(this.currentFilter.topic))) {
                 return false;
             }
             
-            // Vanguard filter
             if (this.currentFilter.vanguard && !bm.isVanguard) {
                 return false;
             }
             
-            // Search
             if (this.currentFilter.search) {
                 const search = this.currentFilter.search;
                 const searchable = `${bm.title} ${bm.url} ${bm.tags?.join(' ')} ${bm.topics?.join(' ')}`.toLowerCase();
@@ -188,7 +301,7 @@ const app = {
     },
 
     sortBookmarks(bookmarks) {
-        const sortBy = document.getElementById('sortSelect').value;
+        const sortBy = document.getElementById('sortSelect')?.value || 'recent';
         
         return [...bookmarks].sort((a, b) => {
             switch (sortBy) {
@@ -205,6 +318,7 @@ const app = {
 
     renderGridView(bookmarks) {
         const grid = document.getElementById('bookmarksGrid');
+        if (!grid) return;
         grid.innerHTML = '';
         
         bookmarks.forEach(bm => {
@@ -215,6 +329,7 @@ const app = {
 
     renderListView(bookmarks) {
         const list = document.getElementById('bookmarksList');
+        if (!list) return;
         list.innerHTML = '';
         
         bookmarks.forEach(bm => {
@@ -228,28 +343,17 @@ const app = {
         card.className = `bookmark-card ${bm.isVanguard ? 'vanguard' : ''}`;
         card.dataset.id = bm.id;
         
-        const typeIcon = this.getTypeIcon(bm.type);
-        
         card.innerHTML = `
             <div class="bookmark-card-header">
-                <div class="bookmark-type">
-                    ${typeIcon} ${bm.type || 'article'}
-                </div>
+                <div class="bookmark-type">${this.getTypeIcon(bm.type)} ${bm.type || 'article'}</div>
                 <div class="bookmark-actions">
-                    <button class="bookmark-action-btn" data-action="open" title="Abrir">
-                        <span>🔗</span>
-                    </button>
-                    <button class="bookmark-action-btn" data-action="edit" title="Editar">
-                        <span>✏️</span>
-                    </button>
+                    <button class="bookmark-action-btn" data-action="open" title="Abrir">🔗</button>
+                    <button class="bookmark-action-btn" data-action="edit" title="Editar">✏️</button>
                 </div>
             </div>
             <div class="bookmark-card-body">
                 <h3 class="bookmark-title">${this.escapeHtml(bm.title)}</h3>
-                <div class="bookmark-domain">
-                    ${bm.favicon ? `<img src="${bm.favicon}" alt="" onerror="this.style.display='none'">` : '🌐'}
-                    ${this.getDomain(bm.url)}
-                </div>
+                <div class="bookmark-domain">${this.getDomain(bm.url)}</div>
                 ${bm.description ? `<p class="bookmark-description">${this.escapeHtml(bm.description)}</p>` : ''}
                 <div class="bookmark-tags">
                     ${(bm.tags || []).slice(0, 4).map(tag => 
@@ -257,7 +361,7 @@ const app = {
                     ).join('')}
                 </div>
             </div>
-            ${bm.isVanguard ? '<div class="bookmark-vanguard-badge">🔬 VANGUARD</div>' : ''}
+            ${bm.isVanguard ? '<div class="bookmark-vanguard-badge">VANGUARD</div>' : ''}
         `;
         
         card.addEventListener('click', (e) => {
@@ -301,9 +405,7 @@ const app = {
                     `<span class="bookmark-tag">#${this.escapeHtml(tag)}</span>`
                 ).join('')}
             </div>
-            <div class="bookmark-row-date">
-                ${new Date(bm.createdAt).toLocaleDateString()}
-            </div>
+            <div class="bookmark-row-date">${new Date(bm.createdAt).toLocaleDateString()}</div>
         `;
         
         row.addEventListener('click', () => this.showBookmarkDetail(bm.id));
@@ -322,6 +424,8 @@ const app = {
 
     renderTags() {
         const container = document.getElementById('recentTags');
+        if (!container) return;
+        
         const tagCounts = {};
         
         this.bookmarks.forEach(bm => {
@@ -349,15 +453,17 @@ const app = {
 
     renderTopicsTree() {
         const container = document.getElementById('topicsTree');
+        if (!container) return;
         
-        // Build tree structure
         const rootTopics = this.topics.filter(t => !t.parent);
         
         container.innerHTML = rootTopics.map(topic => this.renderTopicItem(topic)).join('');
         
         container.querySelectorAll('.topic-item').forEach(item => {
             item.addEventListener('click', () => {
-                this.filterByTopic(item.dataset.id);
+                if (item.dataset.id) {
+                    this.filterByTopic(item.dataset.id);
+                }
             });
         });
     },
@@ -369,7 +475,7 @@ const app = {
         
         return `
             <div class="topic-item ${isActive ? 'active' : ''}" data-id="${topic.id}" data-name="${topic.name}">
-                ${hasChildren ? `<span class="topic-expand">▶</span>` : '<span style="width:16px"></span>'}
+                ${hasChildren ? '<span class="topic-expand">▶</span>' : '<span style="width:14px"></span>'}
                 <span>${topic.name}</span>
             </div>
             ${hasChildren ? `<div class="topic-children">${children.map(c => this.renderTopicItem(c)).join('')}</div>` : ''}
@@ -378,6 +484,8 @@ const app = {
 
     renderVanguardList() {
         const container = document.getElementById('vanguardList');
+        if (!container) return;
+        
         const vanguardBookmarks = this.bookmarks.filter(bm => bm.isVanguard);
         
         container.innerHTML = vanguardBookmarks.slice(0, 5).map(bm => `
@@ -388,7 +496,9 @@ const app = {
         
         container.querySelectorAll('.sidebar-item').forEach(item => {
             item.addEventListener('click', () => {
-                this.showBookmarkDetail(item.dataset.id);
+                if (item.dataset.id) {
+                    this.showBookmarkDetail(item.dataset.id);
+                }
             });
         });
     },
@@ -413,15 +523,17 @@ const app = {
         const emptyState = document.getElementById('emptyState');
         const gridView = document.getElementById('gridView');
         
-        if (this.bookmarks.length === 0) {
-            emptyState.classList.remove('hidden');
-            gridView.classList.add('hidden');
-        } else {
-            emptyState.classList.add('hidden');
+        if (emptyState && gridView) {
+            if (this.bookmarks.length === 0) {
+                emptyState.classList.remove('hidden');
+                gridView.classList.add('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                gridView.classList.remove('hidden');
+            }
         }
     },
 
-    // Filters
     filterByType(type) {
         this.currentFilter.type = type;
         document.querySelectorAll('#typeFilters .sidebar-item').forEach(item => {
@@ -452,7 +564,6 @@ const app = {
         }
     },
 
-    // View switching
     switchView(view) {
         this.currentView = view;
         
@@ -460,9 +571,13 @@ const app = {
             tab.classList.toggle('active', tab.dataset.view === view);
         });
         
-        document.getElementById('gridView').classList.toggle('hidden', view !== 'grid');
-        document.getElementById('listView').classList.toggle('hidden', view !== 'list');
-        document.getElementById('graphView').classList.toggle('hidden', view !== 'graph');
+        const gridView = document.getElementById('gridView');
+        const listView = document.getElementById('listView');
+        const graphView = document.getElementById('graphView');
+        
+        if (gridView) gridView.classList.toggle('hidden', view !== 'grid');
+        if (listView) listView.classList.toggle('hidden', view !== 'list');
+        if (graphView) graphView.classList.toggle('hidden', view !== 'graph');
         
         if (view === 'graph') {
             setTimeout(() => {
@@ -472,119 +587,141 @@ const app = {
         }
     },
 
-    // Detail panel
     showBookmarkDetail(id) {
         const bm = this.bookmarks.find(b => b.id === id);
         if (!bm) return;
         
         this.selectedBookmark = bm;
         
-        document.getElementById('detailType').textContent = `${this.getTypeIcon(bm.type)} ${bm.type || 'article'}`;
-        document.getElementById('detailTitle').textContent = bm.title;
-        document.getElementById('detailUrl').href = bm.url;
-        document.getElementById('detailUrl').textContent = bm.url;
-        document.getElementById('detailNotes').value = bm.notes || '';
+        const detailType = document.getElementById('detailType');
+        const detailTitle = document.getElementById('detailTitle');
+        const detailUrl = document.getElementById('detailUrl');
+        const detailNotes = document.getElementById('detailNotes');
+        const detailTags = document.getElementById('detailTags');
+        const detailTopics = document.getElementById('detailTopics');
         
-        // Tags
-        const tagsContainer = document.getElementById('detailTags');
-        tagsContainer.innerHTML = (bm.tags || []).map(tag => 
-            `<span class="tag-chip">#${this.escapeHtml(tag)}</span>`
-        ).join('');
+        if (detailType) detailType.textContent = `${this.getTypeIcon(bm.type)} ${bm.type || 'article'}`;
+        if (detailTitle) detailTitle.textContent = bm.title;
+        if (detailUrl) {
+            detailUrl.href = bm.url;
+            detailUrl.textContent = bm.url;
+        }
+        if (detailNotes) detailNotes.value = bm.notes || '';
         
-        // Topics
-        const topicsContainer = document.getElementById('detailTopics');
-        if (bm.topics && bm.topics.length > 0) {
-            topicsContainer.innerHTML = `
-                <div class="detail-topics-title">Ruta de Temas:</div>
-                <div class="detail-topics-list">
-                    ${bm.topics.map(topic => `
-                        <div class="topic-path">
-                            ${topic.split(' > ').map((t, i, arr) => 
-                                `<span>${i < arr.length - 1 ? t + ' ' : ''}</span>${i < arr.length - 1 ? '<span class="topic-separator">›</span>' : ''}`
-                            ).join('')}
-                        </div>
-                    `).join('')}
-                </div>
-            `;
-        } else {
-            topicsContainer.innerHTML = '';
+        if (detailTags) {
+            detailTags.innerHTML = (bm.tags || []).map(tag => 
+                `<span class="tag-chip">#${this.escapeHtml(tag)}</span>`
+            ).join('');
         }
         
-        // Related bookmarks
+        if (detailTopics) {
+            if (bm.topics && bm.topics.length > 0) {
+                detailTopics.innerHTML = `
+                    <div class="detail-topics-title">Ruta de Temas:</div>
+                    <div class="detail-topics-list">
+                        ${bm.topics.map(topic => `
+                            <div class="topic-path">${topic}</div>
+                        `).join('')}
+                    </div>
+                `;
+            } else {
+                detailTopics.innerHTML = '';
+            }
+        }
+        
         const relatedList = document.getElementById('relatedList');
-        const related = this.bookmarks.filter(b => 
-            b.id !== bm.id && (
-                b.type === bm.type ||
-                b.topics?.some(t => bm.topics?.includes(t)) ||
-                b.tags?.some(t => bm.tags?.includes(t))
-            )
-        ).slice(0, 5);
+        if (relatedList) {
+            const related = this.bookmarks.filter(b => 
+                b.id !== bm.id && (
+                    b.type === bm.type ||
+                    b.topics?.some(t => bm.topics?.includes(t)) ||
+                    b.tags?.some(t => bm.tags?.includes(t))
+                )
+            ).slice(0, 5);
+            
+            relatedList.innerHTML = related.map(r => `
+                <div class="related-item" data-id="${r.id}">
+                    <span class="related-item-icon">${this.getTypeIcon(r.type)}</span>
+                    <span class="related-item-title">${this.escapeHtml(r.title)}</span>
+                </div>
+            `).join('');
+            
+            relatedList.querySelectorAll('.related-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    if (item.dataset.id) {
+                        this.showBookmarkDetail(item.dataset.id);
+                    }
+                });
+            });
+        }
         
-        relatedList.innerHTML = related.map(r => `
-            <div class="related-item" data-id="${r.id}">
-                <span class="related-item-icon">${this.getTypeIcon(r.type)}</span>
-                <span class="related-item-title">${this.escapeHtml(r.title)}</span>
-            </div>
-        `).join('');
-        
-        relatedList.querySelectorAll('.related-item').forEach(item => {
-            item.addEventListener('click', () => this.showBookmarkDetail(item.dataset.id));
-        });
-        
-        document.getElementById('detailPanel').classList.remove('hidden');
+        const detailPanel = document.getElementById('detailPanel');
+        if (detailPanel) detailPanel.classList.remove('hidden');
     },
 
     hideDetailPanel() {
-        document.getElementById('detailPanel').classList.add('hidden');
+        const detailPanel = document.getElementById('detailPanel');
+        if (detailPanel) detailPanel.classList.add('hidden');
         this.selectedBookmark = null;
     },
 
     async saveNotes() {
         if (!this.selectedBookmark) return;
         
-        this.selectedBookmark.notes = document.getElementById('detailNotes').value;
+        const detailNotes = document.getElementById('detailNotes');
+        if (detailNotes) {
+            this.selectedBookmark.notes = detailNotes.value;
+        }
         this.selectedBookmark.updatedAt = new Date().toISOString();
         
         await bookmarkStore.saveBookmark(this.selectedBookmark);
         this.showToast('Notas guardadas', 'success');
     },
 
-    // Modals
     showModal(modalId) {
-        document.getElementById('modalOverlay').classList.remove('hidden');
-        document.getElementById(modalId).classList.remove('hidden');
+        const overlay = document.getElementById('modalOverlay');
+        const modal = document.getElementById(modalId);
+        
+        if (overlay) overlay.classList.remove('hidden');
+        if (modal) modal.classList.remove('hidden');
     },
 
     closeModal(modalId) {
-        document.getElementById(modalId).classList.add('hidden');
+        const modal = document.getElementById(modalId);
+        const overlay = document.getElementById('modalOverlay');
+        
+        if (modal) modal.classList.add('hidden');
+        
         const anyOpen = document.querySelectorAll('.modal:not(.hidden)').length === 0;
-        if (anyOpen) {
-            document.getElementById('modalOverlay').classList.add('hidden');
+        if (overlay && anyOpen) {
+            overlay.classList.add('hidden');
         }
     },
 
     closeAllModals() {
         document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
-        document.getElementById('modalOverlay').classList.add('hidden');
+        const overlay = document.getElementById('modalOverlay');
+        if (overlay) overlay.classList.add('hidden');
     },
 
     showImportArea(type) {
         const importArea = document.getElementById('importArea');
         const pasteArea = document.getElementById('pasteArea');
         
-        importArea.classList.add('hidden');
-        pasteArea.classList.add('hidden');
+        if (importArea) importArea.classList.add('hidden');
+        if (pasteArea) pasteArea.classList.add('hidden');
         
         if (type === 'file' || type === 'json') {
-            importArea.classList.remove('hidden');
-            document.getElementById('fileInput').accept = type === 'json' ? '.json' : '.html';
+            if (importArea) importArea.classList.remove('hidden');
+            const fileInput = document.getElementById('fileInput');
+            if (fileInput) fileInput.accept = type === 'json' ? '.json' : '.html';
         } else if (type === 'paste') {
-            pasteArea.classList.remove('hidden');
-            document.getElementById('urlInput').focus();
+            if (pasteArea) pasteArea.classList.remove('hidden');
+            const urlInput = document.getElementById('urlInput');
+            if (urlInput) urlInput.focus();
         }
     },
 
-    // Import
     async handleFileImport(file) {
         if (!file) return;
         
@@ -592,7 +729,7 @@ const app = {
         const progressFill = document.getElementById('progressFill');
         const progressText = document.getElementById('progressText');
         
-        progress.classList.remove('hidden');
+        if (progress) progress.classList.remove('hidden');
         
         try {
             let bookmarks;
@@ -603,19 +740,21 @@ const app = {
                 bookmarks = await bookmarkParser.parseHTML(file);
             }
             
-            progressText.textContent = `Analizando ${bookmarks.length} marcadores...`;
+            if (progressText) progressText.textContent = `Analizando ${bookmarks.length} marcadores...`;
             
             let imported = 0;
             for (const bm of bookmarks) {
                 await bookmarkStore.saveBookmark(bm);
                 imported++;
-                progressFill.style.width = `${(imported / bookmarks.length) * 100}%`;
+                if (progressFill) {
+                    progressFill.style.width = `${(imported / bookmarks.length) * 100}%`;
+                }
                 await new Promise(r => setTimeout(r, 5));
             }
             
             this.bookmarks = await bookmarkStore.getAllBookmarks();
             
-            progressText.textContent = 'Generando temas automáticamente...';
+            if (progressText) progressText.textContent = 'Generando temas automáticamente...';
             
             await this.generateTopicsFromBookmarks();
             
@@ -628,8 +767,8 @@ const app = {
             console.error('Import error:', error);
             this.showToast('Error al importar: ' + error.message, 'error');
         } finally {
-            progress.classList.add('hidden');
-            progressFill.style.width = '0%';
+            if (progress) progress.classList.add('hidden');
+            if (progressFill) progressFill.style.width = '0%';
         }
     },
 
@@ -652,10 +791,6 @@ const app = {
     async addBookmarkFromUrl(url) {
         if (!url) return;
         
-        const preview = document.getElementById('fetchPreview');
-        preview.classList.remove('hidden');
-        preview.querySelector('.preview-content').innerHTML = '<p>Cargando...</p>';
-        
         try {
             const metadata = await bookmarkParser.fetchMetadata(url);
             const analysis = autoTagger.analyze(metadata.title + ' ' + url);
@@ -676,13 +811,6 @@ const app = {
                 relations: []
             };
             
-            preview.querySelector('.preview-content').innerHTML = `
-                <p><strong>${this.escapeHtml(bookmark.title)}</strong></p>
-                <p>Tipo: ${bookmark.type}</p>
-                <p>Tags: ${bookmark.tags.join(', ') || 'Ninguno'}</p>
-                ${bookmark.isVanguard ? '<p>🔬 Investigación de Vanguardia</p>' : ''}
-            `;
-            
             await bookmarkStore.saveBookmark(bookmark);
             this.bookmarks = await bookmarkStore.getAllBookmarks();
             
@@ -697,18 +825,26 @@ const app = {
         }
     },
 
-    // Add/Edit bookmarks
     showAddModal(bookmark = null) {
         this.editingBookmark = bookmark;
         
-        document.getElementById('modalTitle').textContent = bookmark ? 'Editar Marcador' : 'Añadir Marcador';
-        document.getElementById('addUrl').value = bookmark?.url || '';
-        document.getElementById('addTitle').value = bookmark?.title || '';
-        document.getElementById('addTags').value = bookmark?.tags?.join(', ') || '';
-        document.getElementById('addTopics').value = bookmark?.topics?.join(', ') || '';
-        document.getElementById('addType').value = bookmark?.type || 'article';
-        document.getElementById('addVanguard').checked = bookmark?.isVanguard || false;
-        document.getElementById('addNotes').value = bookmark?.notes || '';
+        const modalTitle = document.getElementById('modalTitle');
+        const addUrl = document.getElementById('addUrl');
+        const addTitle = document.getElementById('addTitle');
+        const addTags = document.getElementById('addTags');
+        const addTopics = document.getElementById('addTopics');
+        const addType = document.getElementById('addType');
+        const addVanguard = document.getElementById('addVanguard');
+        const addNotes = document.getElementById('addNotes');
+        
+        if (modalTitle) modalTitle.textContent = bookmark ? 'Editar Marcador' : 'Añadir Marcador';
+        if (addUrl) addUrl.value = bookmark?.url || '';
+        if (addTitle) addTitle.value = bookmark?.title || '';
+        if (addTags) addTags.value = bookmark?.tags?.join(', ') || '';
+        if (addTopics) addTopics.value = bookmark?.topics?.join(', ') || '';
+        if (addType) addType.value = bookmark?.type || 'article';
+        if (addVanguard) addVanguard.checked = bookmark?.isVanguard || false;
+        if (addNotes) addNotes.value = bookmark?.notes || '';
         
         this.showModal('addModal');
     },
@@ -725,13 +861,21 @@ const app = {
     },
 
     async saveBookmarkForm() {
-        const url = document.getElementById('addUrl').value.trim();
-        const title = document.getElementById('addTitle').value.trim();
-        const tagsStr = document.getElementById('addTags').value;
-        const topicsStr = document.getElementById('addTopics').value;
-        const type = document.getElementById('addType').value;
-        const isVanguard = document.getElementById('addVanguard').checked;
-        const notes = document.getElementById('addNotes').value;
+        const addUrl = document.getElementById('addUrl');
+        const addTitle = document.getElementById('addTitle');
+        const addTags = document.getElementById('addTags');
+        const addTopics = document.getElementById('addTopics');
+        const addType = document.getElementById('addType');
+        const addVanguard = document.getElementById('addVanguard');
+        const addNotes = document.getElementById('addNotes');
+        
+        const url = addUrl?.value.trim();
+        const title = addTitle?.value.trim();
+        const tagsStr = addTags?.value || '';
+        const topicsStr = addTopics?.value || '';
+        const type = addType?.value || 'article';
+        const isVanguard = addVanguard?.checked || false;
+        const notes = addNotes?.value || '';
         
         if (!url) {
             this.showToast('La URL es obligatoria', 'error');
@@ -790,7 +934,6 @@ const app = {
         }
     },
 
-    // Export
     async exportJSON() {
         const data = await bookmarkStore.exportAll();
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -804,7 +947,6 @@ const app = {
         this.showToast('Exportación completada', 'success');
     },
 
-    // Sync
     async syncToNotion() {
         if (!notionExporter.isConfigured()) {
             this.showToast('Configura Notion en ajustes', 'warning');
@@ -841,15 +983,18 @@ const app = {
         this.showToast(`${selected.length} notas descargadas`, 'success');
     },
 
-    // Settings
     async showSettings() {
-        const apiKey = await bookmarkStore.getSetting('notionApiKey') || '';
-        const databaseId = await bookmarkStore.getSetting('notionDatabaseId') || '';
+        const notionApiKey = await bookmarkStore.getSetting('notionApiKey') || '';
+        const notionDatabaseId = await bookmarkStore.getSetting('notionDatabaseId') || '';
         const obsidianPath = await bookmarkStore.getSetting('obsidianPath') || '';
         
-        document.getElementById('notionApiKey').value = apiKey;
-        document.getElementById('notionDatabaseId').value = databaseId;
-        document.getElementById('obsidianPath').value = obsidianPath;
+        const nApiKey = document.getElementById('notionApiKey');
+        const nDatabaseId = document.getElementById('notionDatabaseId');
+        const oPath = document.getElementById('obsidianPath');
+        
+        if (nApiKey) nApiKey.value = notionApiKey;
+        if (nDatabaseId) nDatabaseId.value = notionDatabaseId;
+        if (oPath) oPath.value = obsidianPath;
         
         this.renderRulesList();
         this.renderTopicsManager();
@@ -858,19 +1003,17 @@ const app = {
     },
 
     async saveSettings() {
-        const notionApiKey = document.getElementById('notionApiKey').value;
-        const notionDatabaseId = document.getElementById('notionDatabaseId').value;
-        const obsidianPath = document.getElementById('obsidianPath').value;
+        const notionApiKey = document.getElementById('notionApiKey')?.value;
+        const notionDatabaseId = document.getElementById('notionDatabaseId')?.value;
+        const obsidianPath = document.getElementById('obsidianPath')?.value;
         
         await notionExporter.updateConfig(notionApiKey, notionDatabaseId);
         await obsidianExporter.updateConfig(obsidianPath);
-        
-        this.showToast('Configuración guardada', 'success');
     },
 
     async testNotionConnection() {
-        const apiKey = document.getElementById('notionApiKey').value;
-        const databaseId = document.getElementById('notionDatabaseId').value;
+        const apiKey = document.getElementById('notionApiKey')?.value;
+        const databaseId = document.getElementById('notionDatabaseId')?.value;
         
         await notionExporter.updateConfig(apiKey, databaseId);
         const result = await notionExporter.testConnection();
@@ -880,6 +1023,8 @@ const app = {
 
     renderRulesList() {
         const container = document.getElementById('rulesList');
+        if (!container) return;
+        
         const rules = autoTagger.rules;
         
         container.innerHTML = rules.slice(0, 10).map((rule, i) => `
@@ -909,6 +1054,7 @@ const app = {
 
     renderTopicsManager() {
         const container = document.getElementById('topicsManager');
+        if (!container) return;
         
         const rootTopics = this.topics.filter(t => !t.parent);
         
@@ -939,22 +1085,26 @@ const app = {
         this.showToast('Tema añadido', 'success');
     },
 
-    // Context menu
     showContextMenu(e, bookmarkId) {
         const menu = document.getElementById('contextMenu');
+        if (!menu) return;
+        
         menu.classList.remove('hidden');
         menu.style.left = `${e.clientX}px`;
         menu.style.top = `${e.clientY}px`;
         menu.dataset.bookmarkId = bookmarkId;
+        
+        e.stopPropagation();
     },
 
     hideContextMenu() {
-        document.getElementById('contextMenu').classList.add('hidden');
+        const menu = document.getElementById('contextMenu');
+        if (menu) menu.classList.add('hidden');
     },
 
     async handleContextAction(action) {
         const menu = document.getElementById('contextMenu');
-        const id = menu.dataset.bookmarkId;
+        const id = menu?.dataset.bookmarkId;
         
         if (!id) return;
         
@@ -988,9 +1138,10 @@ const app = {
         this.hideContextMenu();
     },
 
-    // Toast notifications
     showToast(message, type = 'info') {
         const container = document.getElementById('toastContainer');
+        if (!container) return;
+        
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
         
@@ -1014,7 +1165,6 @@ const app = {
         }, 3000);
     },
 
-    // Utilities
     getTypeIcon(type) {
         const icons = {
             video: '🎥',
@@ -1041,7 +1191,6 @@ const app = {
     }
 };
 
-// Initialize app
 document.addEventListener('DOMContentLoaded', () => {
     app.init();
 });
