@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bookmark Manager</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --bg: #000; --bg2: #0a0a0a; --bg3: #141414; --border: #222; --text: #fff; --text2: #888; --text3: #444; }
+        body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; }
+        
+        .header { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; border-bottom: 1px solid var(--border); }
+        .logo { font-size: 14px; font-weight: 600; color: var(--text2); }
+        .header-btns { display: flex; gap: 8px; }
+        .btn { padding: 8px 14px; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; color: var(--text2); cursor: pointer; font-size: 12px; }
+        .btn:hover { border-color: var(--text3); color: var(--text); }
+        .btn-primary { background: #fff; color: #000; border-color: #fff; }
+        .btn-primary:hover { background: #eee; }
+        
+        .layout { display: flex; height: calc(100vh - 53px); }
+        .sidebar { width: 200px; background: var(--bg); border-right: 1px solid var(--border); overflow-y: auto; padding: 12px 0; }
+        .sidebar-section { padding: 0 12px 12px; margin-bottom: 8px; border-bottom: 1px solid var(--border); }
+        .sidebar-section:last-child { border-bottom: none; }
+        .sidebar-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); margin-bottom: 8px; }
+        .sidebar-item { padding: 8px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; color: var(--text2); display: flex; justify-content: space-between; }
+        .sidebar-item:hover { background: var(--bg3); color: var(--text); }
+        .sidebar-item.active { background: var(--bg3); color: var(--text); }
+        .sidebar-item .count { font-size: 10px; color: var(--text3); }
+        
+        .main { flex: 1; overflow-y: auto; padding: 20px; }
+        .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+        .tab { padding: 8px 16px; background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 12px; color: var(--text2); }
+        .tab.active { background: var(--bg3); color: var(--text); border-color: var(--text3); }
+        
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+        .card { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 14px; cursor: pointer; transition: border-color 0.15s; }
+        .card:hover { border-color: var(--text3); }
+        .card-type { font-size: 10px; color: var(--text3); text-transform: uppercase; margin-bottom: 6px; }
+        .card-title { font-size: 13px; font-weight: 500; margin-bottom: 4px; line-height: 1.4; }
+        .card-domain { font-size: 10px; color: var(--text3); margin-bottom: 10px; }
+        .card-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+        .tag { padding: 2px 6px; background: var(--bg); border-radius: 8px; font-size: 10px; color: var(--text3); }
+        
+        .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; }
+        .empty-icon { font-size: 48px; opacity: 0.3; margin-bottom: 16px; }
+        .empty h2 { font-size: 16px; font-weight: 500; color: var(--text2); margin-bottom: 8px; }
+        .empty p { font-size: 12px; color: var(--text3); margin-bottom: 20px; }
+        
+        .graph-container { width: 100%; height: calc(100vh - 140px); background: var(--bg2); border-radius: 8px; position: relative; }
+        .graph-container svg { width: 100%; height: 100%; }
+        
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-overlay.show { display: flex; }
+        .modal { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; width: 90%; max-width: 480px; max-height: 85vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 16px; border-bottom: 1px solid var(--border); }
+        .modal-header h3 { font-size: 14px; font-weight: 500; }
+        .modal-close { background: none; border: none; color: var(--text2); cursor: pointer; font-size: 16px; padding: 4px 8px; }
+        .modal-close:hover { color: var(--text); }
+        .modal-body { padding: 16px; }
+        .modal-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 16px; border-top: 1px solid var(--border); }
+        
+        .import-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+        .import-option { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; text-align: center; }
+        .import-option:hover { border-color: var(--text3); }
+        .import-option-icon { font-size: 20px; opacity: 0.6; }
+        .import-option span { font-size: 11px; font-weight: 500; }
+        .import-option p { font-size: 9px; color: var(--text3); margin: 0; }
+        
+        .drop-zone { border: 2px dashed var(--border); border-radius: 8px; padding: 32px; text-align: center; cursor: pointer; margin-top: 12px; }
+        .drop-zone:hover { border-color: var(--text3); }
+        .drop-zone-icon { font-size: 28px; opacity: 0.4; margin-bottom: 8px; }
+        .drop-zone p { font-size: 12px; color: var(--text2); margin-bottom: 4px; }
+        .drop-zone span { font-size: 10px; color: var(--text3); }
+        
+        .form-group { margin-bottom: 14px; }
+        .form-group label { display: block; font-size: 11px; color: var(--text3); margin-bottom: 6px; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 13px; }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--text3); }
+        
+        .progress { margin-top: 12px; display: none; }
+        .progress.show { display: block; }
+        .progress-bar { height: 4px; background: var(--bg); border-radius: 2px; overflow: hidden; }
+        .progress-fill { height: 100%; background: #fff; width: 0%; transition: width 0.3s; }
+        .progress-text { font-size: 11px; color: var(--text3); text-align: center; margin-top: 8px; }
+        
+        .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 2000; }
+        .toast { padding: 10px 14px; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; margin-top: 8px; font-size: 12px; animation: slideIn 0.2s; }
+        .toast.success { border-left: 3px solid #4ade80; }
+        .toast.error { border-left: 3px solid #f87171; }
+        @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="logo">📚 Bookmark Manager</div>
+        <div class="header-btns">
+            <button class="btn" id="btnImport">📥 Importar</button>
+            <button class="btn" id="btnAdd">➕ Añadir</button>
+            <button class="btn" id="btnExport">📤 Exportar</button>
+        </div>
+    </header>
+    
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-title">Tipo</div>
+                <div class="sidebar-item active" data-type="all">🌐 Todos <span class="count" id="countAll">0</span></div>
+                <div class="sidebar-item" data-type="video">🎥 Videos <span class="count" id="countVideo">0</span></div>
+                <div class="sidebar-item" data-type="pdf">📄 PDFs <span class="count" id="countPdf">0</span></div>
+                <div class="sidebar-item" data-type="article">📝 Artículos <span class="count" id="countArticle">0</span></div>
+                <div class="sidebar-item" data-type="blog">💻 Blogs <span class="count" id="countBlog">0</span></div>
+                <div class="sidebar-item" data-type="tutorial">📚 Tutoriales <span class="count" id="countTutorial">0</span></div>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-title">Tags</div>
+                <div id="tagsList"></div>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-title">Temas</div>
+                <div id="topicsList"></div>
+            </div>
+        </aside>
+        
+        <main class="main">
+            <div class="tabs">
+                <button class="tab active" data-view="grid">▦ Grid</button>
+                <button class="tab" data-view="graph">◉ Grafo</button>
+            </div>
+            
+            <div id="emptyState" class="empty">
+                <div class="empty-icon">📚</div>
+                <h2>No hay marcadores</h2>
+                <p>Importa tus marcadores o añade nuevos enlaces</p>
+                <button class="btn btn-primary" id="btnEmptyImport">📥 Importar Marcadores</button>
+            </div>
+            
+            <div id="gridView" class="grid"></div>
+            <div id="graphView" class="graph-container hidden">
+                <svg id="graphSvg"></svg>
+            </div>
+        </main>
+    </div>
+    
+    <!-- Import Modal -->
+    <div class="modal-overlay" id="importModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Importar Marcadores</h3>
+                <button class="modal-close" onclick="closeModal('importModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="import-options">
+                    <div class="import-option" onclick="showImportArea('file')">
+                        <div class="import-option-icon">📁</div>
+                        <span>Archivo HTML</span>
+                        <p>Chrome, Firefox</p>
+                    </div>
+                    <div class="import-option" onclick="showImportArea('paste')">
+                        <div class="import-option-icon">📋</div>
+                        <span>Pegar URL</span>
+                        <p>Añadir enlace</p>
+                    </div>
+                    <div class="import-option" onclick="showImportArea('json')">
+                        <div class="import-option-icon">📦</div>
+                        <span>JSON</span>
+                        <p>Backup</p>
+                    </div>
+                </div>
+                
+                <div id="importFileArea" class="hidden">
+                    <div class="drop-zone" onclick="document.getElementById('fileInput').click()">
+                        <div class="drop-zone-icon">📂</div>
+                        <p>Arrastra archivo HTML aquí</p>
+                        <span>o haz clic para seleccionar</span>
+                    </div>
+                    <input type="file" id="fileInput" accept=".html,.json" class="hidden" onchange="handleFile(this.files[0])">
+                </div>
+                
+                <div id="importPasteArea" class="hidden">
+                    <input type="url" id="urlInput" placeholder="https://..." style="margin-bottom: 8px;">
+                    <button class="btn btn-primary" style="width: 100%;" onclick="addBookmarkFromUrl()">Añadir</button>
+                </div>
+                
+                <div id="importJsonArea" class="hidden">
+                    <div class="drop-zone" onclick="document.getElementById('jsonInput').click()">
+                        <div class="drop-zone-icon">📦</div>
+                        <p>Arrastra archivo JSON</p>
+                        <span>o haz clic para seleccionar</span>
+                    </div>
+                    <input type="file" id="jsonInput" accept=".json" class="hidden" onchange="handleFile(this.files[0])">
+                </div>
+                
+                <div id="importProgress" class="progress">
+                    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+                    <div class="progress-text" id="progressText">Importando...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Add Modal -->
+    <div class="modal-overlay" id="addModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Añadir Marcador</h3>
+                <button class="modal-close" onclick="closeModal('addModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>URL</label>
+                    <input type="url" id="addUrl" placeholder="https://...">
+                </div>
+                <div class="form-group">
+                    <label>Título</label>
+                    <input type="text" id="addTitle" placeholder="Título del marcador">
+                </div>
+                <div class="form-group">
+                    <label>Tags (separados por coma)</label>
+                    <input type="text" id="addTags" placeholder="python, machine-learning">
+                </div>
+                <div class="form-group">
+                    <label>Tipo</label>
+                    <select id="addType">
+                        <option value="article">📝 Artículo</option>
+                        <option value="video">🎥 Video</option>
+                        <option value="pdf">📄 PDF</option>
+                        <option value="blog">💻 Blog</option>
+                        <option value="tutorial">📚 Tutorial</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeModal('addModal')">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveBookmark()">Guardar</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        const API_URL = 'http://localhost:5000/api';
+        let bookmarks = [];
+        let currentFilter = { type: 'all' };
+        let currentView = 'grid';
+        
+        // ==================== INIT ====================
+        async function init() {
+            await loadBookmarks();
+            setupEvents();
+            render();
+        }
+        
+        async function loadBookmarks() {
+            try {
+                const res = await fetch(`${API_URL}/bookmarks`);
+                bookmarks = await res.json();
+            } catch (e) {
+                console.error('Error loading:', e);
+                bookmarks = [];
+            }
+        }
+        
+        // ==================== EVENTS ====================
+        function setupEvents() {
+            document.getElementById('btnImport').onclick = () => openModal('importModal');
+            document.getElementById('btnEmptyImport').onclick = () => openModal('importModal');
+            document.getElementById('btnAdd').onclick = () => openModal('addModal');
+            document.getElementById('btnExport').onclick = exportBookmarks;
+            
+            document.querySelectorAll('.sidebar-item[data-type]').forEach(item => {
+                item.onclick = () => filterByType(item.dataset.type);
+            });
+            
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.onclick = () => switchView(tab.dataset.view);
+            });
+            
+            document.addEventListener('dragover', e => e.preventDefault());
+            document.addEventListener('drop', e => {
+                e.preventDefault();
+                if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+            });
+            
+            document.addEventListener('keydown', e => {
+                if (e.key === 'Escape') closeAllModals();
+            });
+        }
+        
+        // ==================== RENDER ====================
+        function render() {
+            renderCounts();
+            renderBookmarks();
+            renderTags();
+            renderTopics();
+            checkEmpty();
+        }
+        
+        function getFiltered() {
+            return bookmarks.filter(b => {
+                if (currentFilter.type !== 'all' && b.type !== currentFilter.type) return false;
+                return true;
+            });
+        }
+        
+        function renderBookmarks() {
+            const filtered = getFiltered();
+            const gridView = document.getElementById('gridView');
+            const graphView = document.getElementById('graphView');
+            
+            if (currentView === 'graph') {
+                gridView.classList.add('hidden');
+                graphView.classList.remove('hidden');
+                renderGraph();
+                return;
+            }
+            
+            gridView.classList.remove('hidden');
+            graphView.classList.add('hidden');
+            
+            gridView.innerHTML = filtered.map(b => `
+                <div class="card" onclick="openBookmark('${b.id}')">
+                    <div class="card-type">${getIcon(b.type)} ${b.type || 'article'}</div>
+                    <div class="card-title">${escapeHtml(b.title)}</div>
+                    <div class="card-domain">${getDomain(b.url)}</div>
+                    <div class="card-tags">
+                        ${(b.tags || []).slice(0, 4).map(t => `<span class="tag">#${escapeHtml(t)}</span>`).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function renderCounts() {
+            const counts = { all: bookmarks.length, video: 0, pdf: 0, article: 0, blog: 0, tutorial: 0 };
+            bookmarks.forEach(b => { if (counts[b.type] !== undefined) counts[b.type]++; });
+            Object.entries(counts).forEach(([t, c]) => {
+                const el = document.getElementById('count' + t.charAt(0).toUpperCase() + t.slice(1));
+                if (el) el.textContent = c;
+            });
+        }
+        
+        function renderTags() {
+            const container = document.getElementById('tagsList');
+            const tagCounts = {};
+            bookmarks.forEach(b => (b.tags || []).forEach(t => tagCounts[t] = (tagCounts[t] || 0) + 1));
+            const sorted = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+            container.innerHTML = sorted.map(([tag]) => `<div class="sidebar-item">#${escapeHtml(tag)}</div>`).join('');
+        }
+        
+        function renderTopics() {
+            const container = document.getElementById('topicsList');
+            const topicCounts = {};
+            bookmarks.forEach(b => (b.topics || []).forEach(t => topicCounts[t] = (topicCounts[t] || 0) + 1));
+            const sorted = Object.entries(topicCounts).sort((a, b) => b[1] - a[1]);
+            container.innerHTML = sorted.map(([topic, count]) => 
+                `<div class="sidebar-item">📁 ${escapeHtml(topic)} <span class="count">${count}</span></div>`
+            ).join('');
+        }
+        
+        function checkEmpty() {
+            const empty = document.getElementById('emptyState');
+            const grid = document.getElementById('gridView');
+            if (bookmarks.length === 0) {
+                empty.classList.remove('hidden');
+                grid.classList.add('hidden');
+            } else {
+                empty.classList.add('hidden');
+                if (currentView === 'grid') grid.classList.remove('hidden');
+            }
+        }
+        
+        // ==================== GRAPH ====================
+        async function renderGraph() {
+            const svg = d3.select('#graphSvg');
+            svg.selectAll('*').remove();
+            
+            const filtered = getFiltered();
+            if (filtered.length === 0) return;
+            
+            const container = document.getElementById('graphView');
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            
+            svg.attr('viewBox', `0 0 ${width} ${height}`);
+            
+            const typeColors = {
+                video: '#ff6b6b',
+                pdf: '#ffc107',
+                article: '#4ecdc4',
+                blog: '#a29bfe',
+                tutorial: '#00d9ff'
+            };
+            
+            // Build nodes
+            const nodes = [];
+            const links = [];
+            const topicMap = {};
+            
+            // Add topic nodes
+            const topicCounts = {};
+            filtered.forEach(b => (b.topics || []).forEach(t => topicCounts[t] = (topicCounts[t] || 0) + 1));
+            
+            Object.entries(topicCounts).forEach(([topic, count]) => {
+                topicMap[topic] = nodes.length;
+                nodes.push({
+                    id: 'topic_' + topic.replace(/\s+/g, '_'),
+                    label: topic,
+                    type: 'topic',
+                    color: '#a29bfe',
+                    size: Math.min(20 + count * 3, 50)
+                });
+            });
+            
+            // Add bookmark nodes
+            filtered.forEach(b => {
+                const nodeIndex = nodes.length;
+                nodes.push({
+                    id: b.id,
+                    label: b.title.substring(0, 25),
+                    type: 'bookmark',
+                    color: typeColors[b.type] || '#666',
+                    size: 8,
+                    url: b.url
+                });
+                
+                (b.topics || []).forEach(topic => {
+                    if (topicMap[topic] !== undefined) {
+                        links.push({
+                            source: nodeIndex,
+                            target: topicMap[topic]
+                        });
+                    }
+                });
+            });
+            
+            // Create simulation
+            const simulation = d3.forceSimulation(nodes)
+                .force('link', d3.forceLink(links).distance(100).strength(0.5))
+                .force('charge', d3.forceManyBody().strength(-200))
+                .force('center', d3.forceCenter(width / 2, height / 2))
+                .force('collision', d3.forceCollide().radius(d => d.size + 10));
+            
+            // Draw links
+            const link = svg.append('g')
+                .selectAll('line')
+                .data(links)
+                .join('line')
+                .attr('stroke', '#333')
+                .attr('stroke-opacity', 0.5)
+                .attr('stroke-width', 1);
+            
+            // Draw nodes
+            const node = svg.append('g')
+                .selectAll('circle')
+                .data(nodes)
+                .join('circle')
+                .attr('r', d => d.size)
+                .attr('fill', d => d.color)
+                .attr('stroke', '#000')
+                .attr('stroke-width', 2)
+                .attr('cursor', 'pointer')
+                .on('click', (e, d) => {
+                    if (d.url) window.open(d.url, '_blank');
+                });
+            
+            // Topic outer ring
+            svg.append('g')
+                .selectAll('circle')
+                .data(nodes.filter(d => d.type === 'topic'))
+                .join('circle')
+                .attr('r', d => d.size + 5)
+                .attr('fill', 'none')
+                .attr('stroke', d => d.color)
+                .attr('stroke-width', 1)
+                .attr('stroke-opacity', 0.4)
+                .attr('stroke-dasharray', '4,2');
+            
+            // Labels
+            const label = svg.append('g')
+                .selectAll('text')
+                .data(nodes.filter(d => d.type === 'topic'))
+                .join('text')
+                .text(d => d.label)
+                .attr('text-anchor', 'middle')
+                .attr('dy', d => d.size + 14)
+                .attr('fill', '#666')
+                .attr('font-size', '10px')
+                .attr('pointer-events', 'none');
+            
+            // Update positions
+            simulation.on('tick', () => {
+                link
+                    .attr('x1', d => d.source.x)
+                    .attr('y1', d => d.source.y)
+                    .attr('x2', d => d.target.x)
+                    .attr('y2', d => d.target.y);
+                
+                node
+                    .attr('cx', d => d.x)
+                    .attr('cy', d => d.y);
+                
+                label
+                    .attr('x', d => d.x)
+                    .attr('y', d => d.y);
+            });
+            
+            // Drag
+            node.call(d3.drag()
+                .on('start', (e, d) => {
+                    if (!e.active) simulation.alphaTarget(0.3).restart();
+                    d.fx = d.x;
+                    d.fy = d.y;
+                })
+                .on('drag', (e, d) => {
+                    d.fx = e.x;
+                    d.fy = e.y;
+                })
+                .on('end', (e, d) => {
+                    if (!e.active) simulation.alphaTarget(0);
+                    d.fx = null;
+                    d.fy = null;
+                }));
+        }
+        
+        // ==================== ACTIONS ====================
+        function filterByType(type) {
+            currentFilter.type = type;
+            document.querySelectorAll('.sidebar-item[data-type]').forEach(i => {
+                i.classList.toggle('active', i.dataset.type === type);
+            });
+            renderBookmarks();
+        }
+        
+        function switchView(view) {
+            currentView = view;
+            document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.view === view));
+            renderBookmarks();
+        }
+        
+        function openBookmark(id) {
+            const b = bookmarks.find(bm => bm.id === id);
+            if (b) window.open(b.url, '_blank');
+        }
+        
+        function openModal(id) {
+            document.getElementById(id).classList.add('show');
+        }
+        
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('show');
+        }
+        
+        function closeAllModals() {
+            document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('show'));
+        }
+        
+        function showImportArea(type) {
+            document.getElementById('importFileArea').classList.add('hidden');
+            document.getElementById('importPasteArea').classList.add('hidden');
+            document.getElementById('importJsonArea').classList.add('hidden');
+            
+            if (type === 'file') document.getElementById('importFileArea').classList.remove('hidden');
+            if (type === 'paste') document.getElementById('importPasteArea').classList.remove('hidden');
+            if (type === 'json') document.getElementById('importJsonArea').classList.remove('hidden');
+        }
+        
+        async function handleFile(file) {
+            if (!file) return;
+            
+            const progress = document.getElementById('importProgress');
+            const fill = document.getElementById('progressFill');
+            const text = document.getElementById('progressText');
+            progress.classList.add('show');
+            
+            try {
+                const isJson = file.name.endsWith('.json');
+                let items;
+                
+                if (isJson) {
+                    const content = await file.text();
+                    items = JSON.parse(content);
+                    if (!Array.isArray(items)) items = items.bookmarks || [];
+                } else {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    const res = await fetch(`${API_URL}/parse/html`, { method: 'POST', body: formData });
+                    items = await res.json();
+                }
+                
+                if (!items.length) throw new Error('No se encontraron marcadores');
+                
+                text.textContent = `Importando ${items.length}...`;
+                
+                const res = await fetch(`${API_URL}/bookmarks/import`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ bookmarks: items })
+                });
+                
+                const result = await res.json();
+                await loadBookmarks();
+                render();
+                
+                closeModal('importModal');
+                showToast(`Importados ${result.imported} marcadores`);
+            } catch (e) {
+                showToast('Error: ' + e.message, 'error');
+            } finally {
+                progress.classList.remove('show');
+                fill.style.width = '0%';
+            }
+        }
+        
+        async function addBookmarkFromUrl() {
+            const url = document.getElementById('urlInput').value.trim();
+            if (!url) return;
+            
+            try {
+                await fetch(`${API_URL}/bookmarks`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url })
+                });
+                
+                document.getElementById('urlInput').value = '';
+                await loadBookmarks();
+                render();
+                closeModal('importModal');
+                showToast('Marcador añadido');
+            } catch (e) {
+                showToast('Error: ' + e.message, 'error');
+            }
+        }
+        
+        async function saveBookmark() {
+            const url = document.getElementById('addUrl').value.trim();
+            if (!url) { showToast('URL obligatoria', 'error'); return; }
+            
+            const bookmark = {
+                url,
+                title: document.getElementById('addTitle').value.trim() || url,
+                type: document.getElementById('addType').value,
+                tags: document.getElementById('addTags').value.split(',').map(t => t.trim()).filter(Boolean)
+            };
+            
+            try {
+                await fetch(`${API_URL}/bookmarks`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(bookmark)
+                });
+                
+                document.getElementById('addUrl').value = '';
+                document.getElementById('addTitle').value = '';
+                document.getElementById('addTags').value = '';
+                
+                await loadBookmarks();
+                render();
+                closeModal('addModal');
+                showToast('Guardado');
+            } catch (e) {
+                showToast('Error: ' + e.message, 'error');
+            }
+        }
+        
+        async function exportBookmarks() {
+            try {
+                const res = await fetch(`${API_URL}/export`);
+                const data = await res.json();
+                
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `bookmarks-${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                
+                showToast('Exportado');
+            } catch (e) {
+                showToast('Error: ' + e.message, 'error');
+            }
+        }
+        
+        // ==================== UTILS ====================
+        function getIcon(type) {
+            return { video: '🎥', pdf: '📄', article: '📝', blog: '💻', tutorial: '📚' }[type] || '📄';
+        }
+        
+        function getDomain(url) {
+            try { return new URL(url).hostname.replace('www.', ''); } catch { return url; }
+        }
+        
+        function escapeHtml(text) {
+            const d = document.createElement('div');
+            d.textContent = text;
+            return d.innerHTML;
+        }
+        
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+        
+        // Start
+        init();
+    </script>
+</body>
+</html>
