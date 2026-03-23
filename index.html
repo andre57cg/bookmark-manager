@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Knowledge Graph Bookmark Manager</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <div class="logo">
+                    <span class="logo-icon">🔗</span>
+                    <h1>Knowledge Graph</h1>
+                </div>
+            </div>
+            <div class="header-center">
+                <div class="search-container">
+                    <input type="text" id="searchInput" placeholder="Buscar marcadores, tags, temas...">
+                    <button class="search-btn" id="searchBtn">🔍</button>
+                </div>
+            </div>
+            <div class="header-right">
+                <button class="header-btn" id="importBtn" title="Importar marcadores">
+                    <span>📥</span> Importar
+                </button>
+                <button class="header-btn" id="exportBtn" title="Exportar">
+                    <span>📤</span> Exportar
+                </button>
+                <div class="dropdown">
+                    <button class="header-btn dropdown-toggle" id="syncBtn">
+                        <span>🔄</span> Sync
+                    </button>
+                    <div class="dropdown-menu" id="syncMenu">
+                        <button class="dropdown-item" id="notionBtn">
+                            <span>📓</span> Notion
+                        </button>
+                        <button class="dropdown-item" id="obsidianBtn">
+                            <span>💎</span> Obsidian
+                        </button>
+                    </div>
+                </div>
+                <button class="header-btn" id="settingsBtn" title="Configuración">
+                    <span>⚙️</span>
+                </button>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <!-- Sidebar -->
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">
+                        <span>📂</span> Tipo de Recurso
+                    </h3>
+                    <ul class="sidebar-list" id="typeFilters">
+                        <li class="sidebar-item active" data-type="all">
+                            <span>🌐</span> Todos <span class="count" id="countAll">0</span>
+                        </li>
+                        <li class="sidebar-item" data-type="video">
+                            <span>🎥</span> Videos <span class="count" id="countVideo">0</span>
+                        </li>
+                        <li class="sidebar-item" data-type="article">
+                            <span>📝</span> Artículos <span class="count" id="countArticle">0</span>
+                        </li>
+                        <li class="sidebar-item" data-type="pdf">
+                            <span>📄</span> PDFs <span class="count" id="countPdf">0</span>
+                        </li>
+                        <li class="sidebar-item" data-type="blog">
+                            <span>💻</span> Blogs <span class="count" id="countBlog">0</span>
+                        </li>
+                        <li class="sidebar-item" data-type="tutorial">
+                            <span>📚</span> Tutoriales <span class="count" id="countTutorial">0</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">
+                        <span>🏷️</span> Tags Recientes
+                    </h3>
+                    <div class="tags-container" id="recentTags">
+                        <!-- Tags dinámicos -->
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">
+                        <span>🌳</span> Temas
+                    </h3>
+                    <div class="topics-tree" id="topicsTree">
+                        <!-- Árbol de temas -->
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title vanguard">
+                        <span>🔬</span> Investigación Vanguardia
+                    </h3>
+                    <ul class="sidebar-list" id="vanguardList">
+                        <!-- Links de vanguardia -->
+                    </ul>
+                </div>
+            </aside>
+
+            <!-- Main Area -->
+            <main class="main-area">
+                <!-- View Tabs -->
+                <div class="view-tabs">
+                    <button class="view-tab active" data-view="grid">
+                        <span>▦</span> Grid
+                    </button>
+                    <button class="view-tab" data-view="list">
+                        <span>☰</span> Lista
+                    </button>
+                    <button class="view-tab" data-view="graph">
+                        <span>◉</span> Grafo
+                    </button>
+                    <div class="view-actions">
+                        <select id="sortSelect" class="sort-select">
+                            <option value="recent">Más Recientes</option>
+                            <option value="oldest">Más Antiguos</option>
+                            <option value="alpha">Alfabético</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Grid View -->
+                <div class="view-container" id="gridView">
+                    <div class="bookmarks-grid" id="bookmarksGrid">
+                        <!-- Bookmark cards -->
+                    </div>
+                </div>
+
+                <!-- List View -->
+                <div class="view-container hidden" id="listView">
+                    <div class="bookmarks-list" id="bookmarksList">
+                        <!-- Bookmark rows -->
+                    </div>
+                </div>
+
+                <!-- Graph View -->
+                <div class="view-container hidden" id="graphView">
+                    <div class="graph-container" id="graphContainer">
+                        <svg id="knowledgeGraph"></svg>
+                    </div>
+                    <div class="graph-legend">
+                        <div class="legend-item"><span class="legend-color" style="background: #e94560"></span> Matemáticas</div>
+                        <div class="legend-item"><span class="legend-color" style="background: #00d9ff"></span> Computación</div>
+                        <div class="legend-item"><span class="legend-color" style="background: #7b2cbf"></span> Física</div>
+                        <div class="legend-item"><span class="legend-color" style="background: #00c853"></span> Investigación</div>
+                        <div class="legend-item"><span class="legend-color" style="background: #c44dff"></span> Vanguardia</div>
+                    </div>
+                </div>
+
+                <!-- Empty State -->
+                <div class="empty-state hidden" id="emptyState">
+                    <div class="empty-icon">📚</div>
+                    <h2>No hay marcadores</h2>
+                    <p>Importa tus marcadores o añade nuevos enlaces para comenzar</p>
+                    <button class="btn-primary" id="emptyImportBtn">
+                        <span>📥</span> Importar Marcadores
+                    </button>
+                </div>
+            </main>
+        </div>
+
+        <!-- Detail Panel -->
+        <aside class="detail-panel hidden" id="detailPanel">
+            <div class="detail-header">
+                <button class="detail-close" id="closeDetail">✕</button>
+                <div class="detail-type" id="detailType"></div>
+            </div>
+            <div class="detail-content">
+                <h2 class="detail-title" id="detailTitle"></h2>
+                <a class="detail-url" id="detailUrl" href="#" target="_blank"></a>
+                <div class="detail-tags" id="detailTags"></div>
+                <div class="detail-topics" id="detailTopics"></div>
+                <div class="detail-notes">
+                    <label>Notas:</label>
+                    <textarea id="detailNotes" placeholder="Añade notas sobre este recurso..."></textarea>
+                </div>
+                <div class="detail-actions">
+                    <button class="btn-secondary" id="editBookmark">
+                        <span>✏️</span> Editar
+                    </button>
+                    <button class="btn-danger" id="deleteBookmark">
+                        <span>🗑️</span> Eliminar
+                    </button>
+                </div>
+            </div>
+            <div class="detail-relations">
+                <h4>Relacionado</h4>
+                <div class="related-list" id="relatedList"></div>
+            </div>
+        </aside>
+
+        <!-- Modals -->
+        <div class="modal-overlay hidden" id="modalOverlay">
+            <!-- Import Modal -->
+            <div class="modal hidden" id="importModal">
+                <div class="modal-header">
+                    <h3>Importar Marcadores</h3>
+                    <button class="modal-close" data-modal="importModal">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="import-options">
+                        <div class="import-option" id="importFile">
+                            <div class="import-icon">📁</div>
+                            <span>Archivo HTML</span>
+                            <p>Chrome, Firefox, Edge, Safari</p>
+                        </div>
+                        <div class="import-option" id="importPaste">
+                            <div class="import-icon">📋</div>
+                            <span>Pegar URL</span>
+                            <p>Añadir enlace manualmente</p>
+                        </div>
+                        <div class="import-option" id="importJson">
+                            <div class="import-icon">📦</div>
+                            <span>Importar JSON</span>
+                            <p>Restaurar backup</p>
+                        </div>
+                    </div>
+                    <div class="import-area hidden" id="importArea">
+                        <input type="file" id="fileInput" accept=".html,.json" hidden>
+                        <div class="drop-zone" id="dropZone">
+                            <div class="drop-icon">📂</div>
+                            <p>Arrastra el archivo aquí</p>
+                            <span>o haz clic para seleccionar</span>
+                        </div>
+                    </div>
+                    <div class="paste-area hidden" id="pasteArea">
+                        <input type="url" id="urlInput" placeholder="Pega la URL aquí...">
+                        <div class="fetch-preview hidden" id="fetchPreview">
+                            <div class="preview-content"></div>
+                        </div>
+                    </div>
+                    <div class="import-progress hidden" id="importProgress">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <p class="progress-text" id="progressText">Importando marcadores...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add/Edit Modal -->
+            <div class="modal hidden" id="addModal">
+                <div class="modal-header">
+                    <h3 id="modalTitle">Añadir Marcador</h3>
+                    <button class="modal-close" data-modal="addModal">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="addUrl">URL</label>
+                        <input type="url" id="addUrl" placeholder="https://..." required>
+                    </div>
+                    <div class="form-group">
+                        <label for="addTitle">Título</label>
+                        <input type="text" id="addTitle" placeholder="Título del marcador">
+                    </div>
+                    <div class="form-group">
+                        <label for="addTags">Tags (separados por coma)</label>
+                        <input type="text" id="addTags" placeholder="matemáticas, análisis, topología">
+                    </div>
+                    <div class="form-group">
+                        <label for="addTopics">Temas (jerarquía)</label>
+                        <div class="topics-input" id="topicsInput">
+                            <input type="text" id="addTopics" placeholder="Matemáticas > Análisis > Espacios de Banach">
+                        </div>
+                        <div class="topic-suggestions" id="topicSuggestions"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="addType">Tipo</label>
+                            <select id="addType">
+                                <option value="article">📝 Artículo</option>
+                                <option value="video">🎥 Video</option>
+                                <option value="pdf">📄 PDF</option>
+                                <option value="blog">💻 Blog</option>
+                                <option value="tutorial">📚 Tutorial</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="addVanguard"> 🔬 Investigación Vanguardia
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="addNotes">Notas</label>
+                        <textarea id="addNotes" placeholder="Notas sobre este recurso..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" data-modal="addModal">Cancelar</button>
+                    <button class="btn-primary" id="saveBookmark">Guardar</button>
+                </div>
+            </div>
+
+            <!-- Settings Modal -->
+            <div class="modal hidden" id="settingsModal">
+                <div class="modal-header">
+                    <h3>Configuración</h3>
+                    <button class="modal-close" data-modal="settingsModal">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="settings-section">
+                        <h4>🔑 Integración Notion</h4>
+                        <div class="form-group">
+                            <label for="notionApiKey">API Key de Notion</label>
+                            <input type="password" id="notionApiKey" placeholder="secret_...">
+                        </div>
+                        <div class="form-group">
+                            <label for="notionDatabaseId">Database ID</label>
+                            <input type="text" id="notionDatabaseId" placeholder="xxxxx...">
+                        </div>
+                        <button class="btn-secondary" id="testNotion">Probar Conexión</button>
+                    </div>
+                    <div class="settings-section">
+                        <h4>💎 Exportar a Obsidian</h4>
+                        <div class="form-group">
+                            <label for="obsidianPath">Ruta de Vault</label>
+                            <input type="text" id="obsidianPath" placeholder="C:\Users\...\Obsidian\Vault">
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <h4>🏷️ Reglas de Auto-Etiquetado</h4>
+                        <div class="rules-list" id="rulesList">
+                            <!-- Rules dynamically loaded -->
+                        </div>
+                        <button class="btn-secondary" id="addRule">+ Añadir Regla</button>
+                    </div>
+                    <div class="settings-section">
+                        <h4>🌳 Gestión de Temas</h4>
+                        <div class="topics-manager" id="topicsManager">
+                            <!-- Topics tree -->
+                        </div>
+                        <button class="btn-secondary" id="addTopic">+ Añadir Tema</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Context Menu -->
+    <div class="context-menu hidden" id="contextMenu">
+        <button class="context-item" data-action="open">
+            <span>🔗</span> Abrir
+        </button>
+        <button class="context-item" data-action="edit">
+            <span>✏️</span> Editar
+        </button>
+        <button class="context-item" data-action="copy">
+            <span>📋</span> Copiar URL
+        </button>
+        <div class="context-divider"></div>
+        <button class="context-item" data-action="notion">
+            <span>📓</span> Enviar a Notion
+        </button>
+        <button class="context-item" data-action="obsidian">
+            <span>💎</span> Crear nota Obsidian
+        </button>
+        <div class="context-divider"></div>
+        <button class="context-item danger" data-action="delete">
+            <span>🗑️</span> Eliminar
+        </button>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="data.js"></script>
+    <script src="autoTag.js"></script>
+    <script src="parser.js"></script>
+    <script src="graph.js"></script>
+    <script src="notion.js"></script>
+    <script src="obsidian.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
