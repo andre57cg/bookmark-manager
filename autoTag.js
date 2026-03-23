@@ -103,50 +103,48 @@ const autoTagger = {
     },
 
     generateTopicsFromBookmarks(bookmarks) {
-        const topicPatterns = {
-            'Mathematics': /\b(math|mathematics|algebra|geometry|calculus|analysis|topology|number theory|equation|theorem|proof|theorem|lemma|integral|derivative|differential)\b/i,
-            'Computer Science': /\b(computer science|programming|software|developer|code|coding|algorithm|data structure|computational|computing)\b/i,
-            'Machine Learning': /\b(machine learning|deep learning|neural network|artificial intelligence|AI|ML|DL|training|model|tensor|gradient|backpropagation)\b/i,
-            'Physics': /\b(physics|quantum|relativity|mechanics|thermodynamics|particle|electron|proton|photon|wave|energy|momentum)\b/i,
-            'Quantum Computing': /\b(quantum|qubit|cryptography|entanglement|superposition|quantum gate|decoherence)\b/i,
-            'Data Science': /\b(data science|data analysis|statistics|regression|classification|clustering|visualization|pandas|numpy|jupyter)\b/i,
-            'Web Development': /\b(html|css|javascript|frontend|backend|react|vue|angular|node|api|web app|website)\b/i,
-            'Databases': /\b(database|sql|mongodb|postgresql|mysql|redis|cassandra|nosql|query|index)\b/i,
-            'Cloud': /\b(aws|azure|gcp|cloud|serverless|lambda|docker|kubernetes|container|deployment|devops)\b/i,
-            'Security': /\b(security|cybersecurity|cryptography|encryption|vulnerability|penetration|malware|firewall|authentication)\b/i,
-            'Networks': /\b(network|protocol|http|tcp|ip|router|bandwidth|latency|websocket|server|client)\b/i,
-            'Mobile': /\b(mobile|ios|android|swift|kotlin|react native|flutter|app|smartphone)\b/i,
-            'Blockchain': /\b(blockchain|crypto|bitcoin|ethereum|nft|smart contract|web3|defi|solidity)\b/i,
-            'Biology': /\b(biology|bioinformatics|genomics|protein|DNA|RNA|cell|molecular|gene|evolution)\b/i,
-            'Chemistry': /\b(chemistry|chemical|molecule|reaction|organic|inorganic|periodic|catalyst)\b/i,
-            'Economics': /\b(economics|market|trade|finance|currency|inflation|stock|bond|investment)\b/i,
-            'Psychology': /\b(psychology|cognitive|behavior|mental|brain|neuroscience|therapy|counseling)\b/i,
-            'Philosophy': /\b(philosophy|ethics|metaphysics|epistemology|logic|reasoning|consciousness)\b/i,
-            'Linguistics': /\b(linguistics|language|grammar|syntax|semantics|phonology|morphology|nlp|translation)\b/i,
-            'Engineering': /\b(engineering|mechanical|electrical|civil|aerospace|robotics|automation)\b/i,
-            'Research': /\b(research|study|paper|arxiv|scholar|journal|conference|peer-reviewed|academic)\b/i,
-            'Education': /\b(education|learning|teaching|course|tutorial|workshop|seminar|lecture|training)\b/i,
-            'Business': /\b(business|management|strategy|marketing|startup|entrepreneurship|productivity)\b/i,
-            'Design': /\b(design|UX|UI|graphic|visual|interface|user experience|prototyping|wireframe)\b/i,
-            'Vanguard': /\b(breakthrough|state-of-the-art|frontier|cutting-edge|latest|2024|2025|2026|new approach|revolutionary|emerging)\b/i
+        const detectedTopics = new Map();
+        const topicHierarchy = {
+            'Mathematics': ['Analysis', 'Linear Algebra', 'Calculus', 'Abstract Algebra', 'Number Theory', 'Statistics', 'Optimization'],
+            'Computer Science': ['Algorithms', 'Data Structures', 'Web Development', 'Backend', 'Databases', 'DevOps', 'Security', 'Networking'],
+            'Machine Learning': ['Deep Learning', 'NLP', 'Computer Vision', 'Reinforcement Learning', 'AI Ethics'],
+            'Physics': ['Quantum Mechanics', 'Particle Physics', 'Cosmology', 'General Relativity'],
+            'Research': ['Papers', 'Methodology'],
+            'Education': ['Courses', 'Books', 'Documentation']
         };
 
-        const detectedTopics = new Map();
-
         bookmarks.forEach(bookmark => {
-            const text = `${bookmark.title} ${bookmark.url} ${bookmark.description || ''}`.toLowerCase();
+            // Usar los topics ya detectados del bookmark
+            const topics = bookmark.topics || [];
+            
+            topics.forEach(topicName => {
+                if (!detectedTopics.has(topicName)) {
+                    const parent = this.findParent(topicName, topicHierarchy);
+                    const color = this.getTopicColor(topicName);
+                    
+                    detectedTopics.set(topicName, {
+                        id: this.slugify(topicName),
+                        name: topicName,
+                        path: parent ? [parent, topicName] : [topicName],
+                        parent: parent ? this.slugify(parent) : null,
+                        color: color,
+                        count: 0
+                    });
+                }
+                detectedTopics.get(topicName).count++;
+            });
+        });
 
-            for (const [topicName, pattern] of Object.entries(topicPatterns)) {
-                if (pattern.test(text)) {
-                    if (!detectedTopics.has(topicName)) {
-                        detectedTopics.set(topicName, {
-                            id: this.slugify(topicName),
-                            name: topicName,
-                            path: [topicName],
-                            color: this.getTopicColor(topicName),
-                            count: 0,
-                            relatedTopics: []
-                        });
+        return Array.from(detectedTopics.values()).sort((a, b) => b.count - a.count);
+    },
+
+    findParent(topic, hierarchy) {
+        for (const [parent, children] of Object.entries(hierarchy)) {
+            if (children.includes(topic)) {
+                return parent;
+            }
+        }
+        return null;
                     }
                     detectedTopics.get(topicName).count++;
                 }
@@ -157,72 +155,9 @@ const autoTagger = {
             }
         });
 
-        const topics = Array.from(detectedTopics.values())
+        return Array.from(detectedTopics.values())
             .filter(t => t.count >= 1)
             .sort((a, b) => b.count - a.count);
-
-        this.assignSubtopics(topics, bookmarks);
-
-        return topics;
-    },
-
-    assignSubtopics(topics, bookmarks) {
-        const subtopicPatterns = {
-            'Mathematics': [
-                { name: 'Analysis', patterns: [/\b(analysis|real analysis|complex analysis|functional analysis)\b/i] },
-                { name: 'Algebra', patterns: [/\b(algebra|linear algebra|abstract algebra|group theory)\b/i] },
-                { name: 'Geometry', patterns: [/\b(geometry|differential geometry|euclidean|manifold)\b/i] },
-                { name: 'Calculus', patterns: [/\b(calculus|differential|integral|derivative|limit)\b/i] },
-                { name: 'Statistics', patterns: [/\b(statistics|probabilidad|probability|stochastic)\b/i] },
-                { name: 'Number Theory', patterns: [/\b(number theory|prime|riemann|zeta|diophantine)\b/i] }
-            ],
-            'Machine Learning': [
-                { name: 'Deep Learning', patterns: [/\b(deep learning|neural network|cnn|convolutional|recurrent)\b/i] },
-                { name: 'NLP', patterns: [/\b(nlp|natural language|transformer|attention|gpt|bert|llm)\b/i] },
-                { name: 'Computer Vision', patterns: [/\b(computer vision|image|object detection|yolo|segmentation)\b/i] },
-                { name: 'Reinforcement Learning', patterns: [/\b(reinforcement|policy|reward|agent|environment)\b/i] }
-            ],
-            'Physics': [
-                { name: 'Quantum Mechanics', patterns: [/\b(quantum|schrodinger|heisenberg|wave function)\b/i] },
-                { name: 'Particle Physics', patterns: [/\b(particle|quark|lepton|boson|standard model)\b/i] },
-                { name: 'Cosmology', patterns: [/\b(cosmology|astrophysics|black hole|galaxy|big bang)\b/i] },
-                { name: 'General Relativity', patterns: [/\b(general relativity|spacetime|curvature|gravity)\b/i] }
-            ],
-            'Computer Science': [
-                { name: 'Algorithms', patterns: [/\b(algorithm|complexity|big-o|sorting|searching|graph)\b/i] },
-                { name: 'Software Engineering', patterns: [/\b(software engineering|architecture|microservices|design pattern)\b/i] },
-                { name: 'Operating Systems', patterns: [/\b(operating system|linux|kernel|process|thread|scheduling)\b/i] }
-            ]
-        };
-
-        topics.forEach(topic => {
-            const patterns = subtopicPatterns[topic.name];
-            if (!patterns) return;
-
-            const subtopics = [];
-
-            patterns.forEach(sub => {
-                let count = 0;
-                bookmarks.forEach(bm => {
-                    const text = `${bm.title} ${bm.url}`.toLowerCase();
-                    if (sub.patterns.some(p => p.test(text))) count++;
-                });
-
-                if (count > 0) {
-                    const subtopic = {
-                        id: this.slugify(topic.name) + '-' + this.slugify(sub.name),
-                        name: sub.name,
-                        path: [topic.name, sub.name],
-                        parent: topic.id,
-                        color: topic.color,
-                        count: count
-                    };
-                    subtopics.push(subtopic);
-                }
-            });
-
-            topic.subtopics = subtopics;
-        });
     },
 
     slugify(text) {
@@ -239,63 +174,29 @@ const autoTagger = {
             'Mathematics': '#e94560',
             'Computer Science': '#00d9ff',
             'Machine Learning': '#4ecdc4',
+            'Deep Learning': '#45b7d1',
+            'NLP': '#96ceb4',
             'Physics': '#7b2cbf',
-            'Quantum Computing': '#ff6b6b',
-            'Data Science': '#ffe66d',
+            'Algorithms': '#00d9ff',
+            'Data Structures': '#4ecdc4',
             'Web Development': '#00c853',
+            'Backend': '#54a0ff',
             'Databases': '#ff9f43',
-            'Cloud': '#54a0ff',
-            'Security': '#5f27cd',
+            'DevOps': '#a29bfe',
+            'Security': '#ff6b6b',
             'Networks': '#48dbfb',
-            'Mobile': '#ff9ff3',
-            'Blockchain': '#feca57',
-            'Biology': '#26de81',
-            'Chemistry': '#fd9644',
-            'Economics': '#2bcbba',
-            'Psychology': '#eb3b5a',
-            'Philosophy': '#4b6584',
-            'Linguistics': '#778beb',
-            'Engineering': '#f7b731',
+            'Quantum Mechanics': '#ff9ff3',
+            'Analysis': '#e94560',
+            'Linear Algebra': '#ff6b6b',
+            'Calculus': '#ff4757',
             'Research': '#00c853',
-            'Education': '#a55eea',
-            'Business': '#f8a5c2',
-            'Design': '#ecf0f1',
-            'Vanguard': '#c44dff'
+            'Courses': '#ffc107',
+            'Books': '#795548',
+            'Documentation': '#78909c',
+            'Vanguard': '#c44dff',
+            'Papers': '#00c853',
+            'Methodology': '#795548'
         };
         return colors[topicName] || '#a29bfe';
     }
 };
-
-const defaultRules = [
-    // Videos
-    { pattern: /youtube\.com|youtu\.be|vimeo\.com|dailymotion\.com|twitch\.tv/i, type: 'video' },
-    { pattern: /coursera\.org|udemy\.com.*lecture|edx\.org.*video/i, type: 'video' },
-    
-    // PDFs - extensión directa
-    { pattern: /\.pdf(\?.*)?$/i, type: 'pdf' },
-    
-    // PDFs de fuentes académicas
-    { pattern: /arxiv\.org.*pdf|arxiv\.org\/abs/i, type: 'pdf', tags: ['research', 'academic'] },
-    { pattern: /scholar\.google.*pdf|sciencedirect.*article|springer.*article/i, type: 'pdf', tags: ['research', 'academic'] },
-    { pattern: /ieee.*explore.*pdf|researchgate\.net|academia\.edu/i, type: 'pdf', tags: ['research'] },
-    { pattern: /github\.com.*\.pdf$|raw\.githubusercontent.*\.pdf/i, type: 'pdf' },
-    
-    // Detectar PDF en título
-    { pattern: /\b(pdf|paper|article)\b.*\.(pdf|doc)/i, type: 'pdf' },
-    { pattern: /^(paper|thesis|dissertation).*\.pdf/i, type: 'pdf', tags: ['academic'] },
-    
-    // Blogs y artículos
-    { pattern: /medium\.com|dev\.to|hashnode\.com/i, type: 'article' },
-    { pattern: /blog\.|towardsdatascience\.com/i, type: 'article' },
-    
-    // Blogs personales
-    { pattern: /\.blogspot|\.wordpress\.com|\.wixsite/i, type: 'blog' },
-    
-    // Tutoriales
-    { pattern: /stackoverflow\.com|stackblitz\.com|codepen\.io/i, type: 'tutorial' },
-    { pattern: /docs\.|documentation|wiki/i, type: 'tutorial' },
-    
-    // Vanguardia
-    { pattern: /breakthrough|state-of-the-art|frontier|latest.*research|new.*paper/i, isVanguard: true, tags: ['vanguard'] },
-    { pattern: /2024|2025|2026.*research|recent.*publication/i, isVanguard: true }
-];

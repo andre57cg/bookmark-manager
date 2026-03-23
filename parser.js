@@ -90,6 +90,12 @@ const bookmarkParser = {
             // Usar el detector de tipos mejorado
             const type = typeDetector.detectType(raw.url, raw.title);
             
+            // Detectar temas
+            const topics = topicDetector.detectTopics(raw.url, raw.title);
+            
+            // Detectar si es Vanguard
+            const isVanguard = /\b(breakthrough|state-of-the-art|frontier|cutting-edge|latest|recent|2024|2025|2026|new approach|revolutionary|emerging)\b/i.test(raw.title + ' ' + raw.url);
+            
             let createdAt;
             if (raw.addDate) {
                 const timestamp = parseInt(raw.addDate);
@@ -110,8 +116,8 @@ const bookmarkParser = {
                 favicon: this.getFaviconUrl(raw.url),
                 type: type,
                 tags: this.extractKeywords(raw.title, raw.url),
-                topics: [],
-                isVanguard: false,
+                topics: topics,
+                isVanguard: isVanguard,
                 createdAt: createdAt,
                 updatedAt: new Date().toISOString(),
                 notes: '',

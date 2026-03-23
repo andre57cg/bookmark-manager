@@ -790,16 +790,22 @@ const app = {
     },
 
     async generateTopicsFromBookmarks() {
+        // Detectar topics para bookmarks que no los tienen
+        for (const bm of this.bookmarks) {
+            if (!bm.topics || bm.topics.length === 0) {
+                const topics = topicDetector.detectTopics(bm.url, bm.title);
+                if (topics.length > 0) {
+                    bm.topics = topics;
+                    bm.isVanguard = bm.isVanguard || /\b(breakthrough|state-of-the-art|frontier|latest|2024|2025|2026)/i.test(bm.title + ' ' + bm.url);
+                    await bookmarkStore.saveBookmark(bm);
+                }
+            }
+        }
+        
         const generatedTopics = autoTagger.generateTopicsFromBookmarks(this.bookmarks);
         
         for (const topic of generatedTopics) {
             await bookmarkStore.saveTopic(topic);
-            
-            if (topic.subtopics) {
-                for (const subtopic of topic.subtopics) {
-                    await bookmarkStore.saveTopic(subtopic);
-                }
-            }
         }
         
         this.topics = await bookmarkStore.getAllTopics();
