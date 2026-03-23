@@ -1,193 +1,118 @@
 const bookmarkParser = {
     async parseHTML(file) {
-        const text = await file.text();
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(text, 'text/html');
-        
-        // Detect browser format
-        if (this.isChromeFormat(doc)) {
-            return this.parseChrome(doc);
-        } else if (this.isFirefoxFormat(doc)) {
-            return this.parseFirefox(doc);
-        } else if (this.isSafariFormat(doc)) {
-            return this.parseSafari(doc);
-        } else {
-            // Try generic parsing
-            return this.parseGeneric(doc);
-        }
-    },
-
-    isChromeFormat(doc) {
-        return doc.querySelector('body') !== null && 
-               (doc.querySelector('a') !== null || doc.querySelector('h3') !== null);
-    },
-
-    isFirefoxFormat(doc) {
-        return doc.querySelector('dl') !== null || 
-               doc.querySelector('[标签]') !== null ||
-               doc.title.toLowerCase().includes('bookmarks');
-    },
-
-    isSafariFormat(doc) {
-        return doc.querySelector('doctype')?.name?.toLowerCase() === 'html' &&
-               doc.querySelector('a') !== null;
-    },
-
-    parseChrome(doc) {
-        const bookmarks = [];
-        
-        // Find all bookmark links in the document
-        const links = doc.querySelectorAll('a');
-        
-        links.forEach(link => {
-            const href = link.getAttribute('href');
-            const text = link.textContent.trim();
+        try {
+            const text = await file.text();
             
-            if (href && text && href.startsWith('http')) {
-                const parent = link.closest('dl')?.previousElementSibling;
-                const folder = parent?.textContent?.trim() || 'Sin Carpeta';
-                
-                bookmarks.push({
-                    url: href,
-                    title: text,
-                    folder: folder,
-                    addDate: link.getAttribute('add_date'),
-                    icon: link.getAttribute('icon')
-                });
+            if (!text || text.trim().length === 0) {
+                throw new Error('El archivo está vacío');
             }
-        });
-        
-        // Also try to find nested folders
-        const containers = doc.querySelectorAll('dl');
-        containers.forEach(container => {
-            const header = container.previousElementSibling;
-            const folder = header?.tagName === 'H3' ? header.textContent.trim() : 'Sin Carpeta';
             
-            const links = container.querySelectorAll('a[href]');
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(text, 'text/html');
+            
+            const links = doc.querySelectorAll('a[href]');
+            
+            if (links.length === 0) {
+                throw new Error('No se encontraron marcadores en el archivo');
+            }
+            
+            const bookmarks = [];
+            const seenUrls = new Set();
+            
             links.forEach(link => {
                 const href = link.getAttribute('href');
                 const text = link.textContent.trim();
                 
-                if (href && text && href.startsWith('http')) {
-                    if (!bookmarks.find(b => b.url === href)) {
-                        bookmarks.push({
-                            url: href,
-                            title: text,
-                            folder: folder,
-                            addDate: link.getAttribute('add_date'),
-                            icon: link.getAttribute('icon')
-                        });
-                    }
-                }
-            });
-        });
-        
-        return this.processBookmarks(bookmarks);
-    },
-
-    parseFirefox(doc) {
-        const bookmarks = [];
-        
-        // Firefox uses <dt> elements with <a> inside
-        const items = doc.querySelectorAll('dt');
-        
-        items.forEach(item => {
-            const link = item.querySelector('a');
-            const header = item.querySelector('h3');
-            
-            if (link) {
-                const href = link.getAttribute('href');
-                const text = link.textContent.trim();
-                
-                if (href && text && href.startsWith('http')) {
-                    // Find parent folder
-                    let folder = 'Sin Carpeta';
-                    let sibling = item.previousElementSibling;
-                    while (sibling) {
-                        if (sibling.tagName === 'DT') {
-                            const h3 = sibling.querySelector('h3');
-                            if (h3) {
-                                folder = h3.textContent.trim();
-                                break;
-                            }
-                        }
-                        sibling = sibling.previousElementSibling;
-                    }
+                if (href && text && this.isValidUrl(href) && !seenUrls.has(href)) {
+                    seenUrls.add(href);
                     
                     bookmarks.push({
                         url: href,
                         title: text,
-                        folder: folder,
+                        folder: this.extractFolder(link),
                         addDate: link.getAttribute('add_date'),
                         icon: link.getAttribute('icon')
                     });
                 }
+            });
+            
+            if (bookmarks.length === 0) {
+                throw new Error('No se encontraron URLs válidas en el archivo');
             }
-        });
-        
-        return this.processBookmarks(bookmarks);
+            
+            return this.processBookmarks(bookmarks);
+            
+        } catch (error) {
+            console.error('Error parseando HTML:', error);
+            throw error;
+        }
     },
 
-    parseSafari(doc) {
-        const bookmarks = [];
-        const links = doc.querySelectorAll('a');
-        
-        links.forEach(link => {
-            const href = link.getAttribute('href');
-            const text = link.textContent.trim();
-            
-            if (href && text && (href.startsWith('http') || href.startsWith('https'))) {
-                bookmarks.push({
-                    url: href,
-                    title: text,
-                    folder: 'Importado',
-                    addDate: null,
-                    icon: null
-                });
-            }
-        });
-        
-        return this.processBookmarks(bookmarks);
+    isValidUrl(string) {
+        if (!string) return false;
+        try {
+            const url = new URL(string);
+            return url.protocol === 'http:' || url.protocol === 'https:';
+        } catch {
+            return false;
+        }
     },
 
-    parseGeneric(doc) {
-        const bookmarks = [];
-        const links = doc.querySelectorAll('a[href]');
+    extractFolder(link) {
+        let folder = 'Sin Carpeta';
         
-        links.forEach(link => {
-            const href = link.getAttribute('href');
-            const text = link.textContent.trim();
-            
-            if (href && text && href.startsWith('http')) {
-                bookmarks.push({
-                    url: href,
-                    title: text,
-                    folder: 'Importado',
-                    addDate: null,
-                    icon: null
-                });
+        let parent = link.parentElement;
+        while (parent) {
+            const h3 = parent.querySelector(':scope > h3');
+            if (h3) {
+                folder = h3.textContent.trim();
+                break;
             }
-        });
+            
+            const prev = parent.previousElementSibling;
+            if (prev && (prev.tagName === 'H3' || prev.tagName === 'DT')) {
+                const h = prev.querySelector('h3');
+                if (h) {
+                    folder = h.textContent.trim();
+                    break;
+                }
+            }
+            
+            if (parent.tagName === 'BODY') break;
+            parent = parent.parentElement;
+        }
         
-        return this.processBookmarks(bookmarks);
+        return folder || 'Sin Carpeta';
     },
 
     processBookmarks(rawBookmarks) {
         return rawBookmarks.map(raw => {
             const analysis = autoTagger.analyze(raw.title + ' ' + raw.url);
-            const type = analysis.type || autoTagger.getTypeFromUrl(raw.url);
+            const type = analysis.type || this.guessTypeFromUrl(raw.url);
+            
+            let createdAt;
+            if (raw.addDate) {
+                const timestamp = parseInt(raw.addDate);
+                if (!isNaN(timestamp)) {
+                    createdAt = new Date(timestamp * 1000).toISOString();
+                } else {
+                    createdAt = new Date().toISOString();
+                }
+            } else {
+                createdAt = new Date().toISOString();
+            }
             
             return {
                 id: bookmarkStore.generateId(),
                 url: raw.url,
                 title: raw.title,
                 description: '',
-                favicon: raw.icon || this.getFaviconUrl(raw.url),
+                favicon: this.getFaviconUrl(raw.url),
                 type: type,
                 tags: this.extractKeywords(raw.title, raw.url),
                 topics: analysis.topics,
                 isVanguard: analysis.isVanguard,
-                createdAt: raw.addDate ? new Date(parseInt(raw.addDate) * 1000).toISOString() : new Date().toISOString(),
+                createdAt: createdAt,
                 updatedAt: new Date().toISOString(),
                 notes: '',
                 relations: [],
@@ -196,25 +121,39 @@ const bookmarkParser = {
         });
     },
 
+    guessTypeFromUrl(url) {
+        const urlLower = url.toLowerCase();
+        
+        if (/\.(pdf)(\?.*)?$/i.test(urlLower)) return 'pdf';
+        if (/youtube\.com|youtu\.be|vimeo\.com|dailymotion\.com|twitch\.tv/i.test(urlLower)) return 'video';
+        if (/medium\.com|dev\.to|towardsdatascience\.com|blog\./i.test(urlLower)) return 'article';
+        if (/github\.com\/.*\/releases|download/i.test(urlLower)) return 'pdf';
+        if (/\.md|\.txt|\.rst$/i.test(urlLower)) return 'tutorial';
+        
+        return 'article';
+    },
+
     extractKeywords(title, url) {
         const keywords = [];
         const text = (title + ' ' + url).toLowerCase();
         
-        // Common topic keywords
         const topicPatterns = [
-            'machine learning', 'deep learning', 'neural network', 'python', 'javascript',
-            'react', 'vue', 'angular', 'node', 'database', 'api', 'docker', 'kubernetes',
-            'algorithm', 'data structure', 'tutorial', 'guide', 'course', 'documentation',
-            'research', 'paper', 'study', 'analysis', 'implementation'
+            'machine-learning', 'deep-learning', 'neural-network', 'python', 'javascript',
+            'typescript', 'react', 'vue', 'angular', 'node', 'database', 'api',
+            'docker', 'kubernetes', 'algorithm', 'data-structure', 'tutorial',
+            'guide', 'course', 'documentation', 'research', 'paper', 'study',
+            'analysis', 'implementation', 'git', 'github', 'linux', 'windows',
+            'security', 'crypto', 'blockchain', 'ai', 'ml', 'dl', 'nlp'
         ];
         
         topicPatterns.forEach(pattern => {
-            if (text.includes(pattern)) {
-                keywords.push(pattern.replace(/ /g, '-'));
+            const regex = new RegExp(pattern.replace(/-/g, '[\\s_-]'), 'i');
+            if (regex.test(text)) {
+                keywords.push(pattern);
             }
         });
         
-        return keywords.slice(0, 5);
+        return [...new Set(keywords)].slice(0, 5);
     },
 
     getFaviconUrl(url) {
@@ -228,13 +167,6 @@ const bookmarkParser = {
 
     async fetchMetadata(url) {
         try {
-            // Use a CORS proxy or fetch directly
-            const response = await fetch(url, {
-                method: 'HEAD',
-                mode: 'no-cors'
-            });
-            
-            // Since we can't get content with no-cors, return basic info
             return {
                 title: this.extractTitleFromUrl(url),
                 description: '',
@@ -244,7 +176,7 @@ const bookmarkParser = {
             return {
                 title: this.extractTitleFromUrl(url),
                 description: '',
-                image: this.getFaviconUrl(url)
+                image: null
             };
         }
     },
@@ -254,14 +186,13 @@ const bookmarkParser = {
             const urlObj = new URL(url);
             const path = urlObj.pathname;
             
-            // Try to get a meaningful title from URL
             const parts = path.split('/').filter(p => p);
             if (parts.length > 0) {
                 const lastPart = parts[parts.length - 1]
                     .replace(/[-_]/g, ' ')
                     .replace(/\.[^/.]+$/, '')
                     .substring(0, 60);
-                return lastPart || urlObj.hostname;
+                return lastPart || urlObj.hostname.replace('www.', '');
             }
             
             return urlObj.hostname.replace('www.', '');
@@ -271,25 +202,68 @@ const bookmarkParser = {
     },
 
     async parseFromJSON(file) {
-        const text = await file.text();
-        const data = JSON.parse(text);
-        
-        if (Array.isArray(data)) {
-            return data.map(item => ({
-                ...item,
+        try {
+            const text = await file.text();
+            const data = JSON.parse(text);
+            
+            let bookmarksArray = [];
+            
+            if (Array.isArray(data)) {
+                bookmarksArray = data;
+            } else if (data.bookmarks && Array.isArray(data.bookmarks)) {
+                bookmarksArray = data.bookmarks;
+            } else if (typeof data === 'object') {
+                bookmarksArray = Object.values(data).filter(v => v && typeof v === 'object' && v.url);
+            } else {
+                throw new Error('Formato JSON no reconocido');
+            }
+            
+            return bookmarksArray.map(item => ({
                 id: item.id || bookmarkStore.generateId(),
-                updatedAt: new Date().toISOString()
+                url: item.url,
+                title: item.title || item.url,
+                description: item.description || '',
+                favicon: item.favicon || this.getFaviconUrl(item.url),
+                type: item.type || this.guessTypeFromUrl(item.url),
+                tags: item.tags || [],
+                topics: item.topics || [],
+                isVanguard: item.isVanguard || false,
+                createdAt: item.createdAt || new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                notes: item.notes || '',
+                relations: item.relations || [],
+                folder: item.folder || 'Importado'
             }));
+            
+        } catch (error) {
+            console.error('Error parseando JSON:', error);
+            throw new Error('Error al leer el archivo JSON: ' + error.message);
+        }
+    },
+
+    parseNetscapeHtml(html) {
+        const bookmarks = [];
+        const seenUrls = new Set();
+        
+        const linkRegex = /<a[^>]+href=["']([^"']+)["'][^>]*>([^<]+)<\/a>/gi;
+        let match;
+        
+        while ((match = linkRegex.exec(html)) !== null) {
+            const url = match[1];
+            const title = match[2].trim();
+            
+            if (this.isValidUrl(url) && title && !seenUrls.has(url)) {
+                seenUrls.add(url);
+                bookmarks.push({
+                    url: url,
+                    title: title,
+                    folder: 'Importado',
+                    addDate: null,
+                    icon: null
+                });
+            }
         }
         
-        if (data.bookmarks) {
-            return data.bookmarks.map(item => ({
-                ...item,
-                id: item.id || bookmarkStore.generateId(),
-                updatedAt: new Date().toISOString()
-            }));
-        }
-        
-        throw new Error('Formato JSON no válido');
+        return bookmarks;
     }
 };

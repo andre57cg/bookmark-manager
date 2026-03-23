@@ -1370,9 +1370,14 @@ body {
     }
 }
 
-/* Import file/area hidden by default */
+/* Import file/area */
 #importArea, #pasteArea, #importProgress {
     display: none;
+    margin-top: 16px;
+}
+
+#importArea.hidden, #pasteArea.hidden, #importProgress.hidden {
+    display: none !important;
 }
 
 #importArea:not(.hidden), #pasteArea:not(.hidden), #importProgress:not(.hidden) {

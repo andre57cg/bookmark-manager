@@ -89,37 +89,38 @@ const app = {
         const fileInput = document.getElementById('fileInput');
         if (fileInput) {
             fileInput.addEventListener('change', (e) => {
-                if (e.target.files && e.target.files[0]) {
-                    this.handleFileImport(e.target.files[0]);
+                const file = e.target.files?.[0];
+                if (file) {
+                    this.handleFileImport(file);
                 }
             });
         }
 
-        // Drop zone
+        // Drop zone click - trigger file input
         const dropZone = document.getElementById('dropZone');
         if (dropZone) {
-            dropZone.addEventListener('click', () => {
+            dropZone.style.cursor = 'pointer';
+            dropZone.addEventListener('click', (e) => {
+                e.preventDefault();
                 const fi = document.getElementById('fileInput');
-                if (fi) fi.click();
-            });
-            
-            dropZone.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                dropZone.classList.add('dragover');
-            });
-            
-            dropZone.addEventListener('dragleave', () => {
-                dropZone.classList.remove('dragover');
-            });
-            
-            dropZone.addEventListener('drop', (e) => {
-                e.preventDefault();
-                dropZone.classList.remove('dragover');
-                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                    this.handleFileImport(e.dataTransfer.files[0]);
+                if (fi) {
+                    fi.click();
                 }
             });
         }
+
+        // Global drag and drop on document
+        document.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+
+        document.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const file = e.dataTransfer.files?.[0];
+            if (file) {
+                this.handleFileImport(file);
+            }
+        });
 
         // URL paste
         const urlInput = document.getElementById('urlInput');
@@ -723,33 +724,48 @@ const app = {
     },
 
     async handleFileImport(file) {
-        if (!file) return;
+        if (!file) {
+            this.showToast('Selecciona un archivo', 'error');
+            return;
+        }
         
         const progress = document.getElementById('importProgress');
         const progressFill = document.getElementById('progressFill');
         const progressText = document.getElementById('progressText');
         
         if (progress) progress.classList.remove('hidden');
+        if (progressText) progressText.textContent = 'Leyendo archivo...';
+        if (progressFill) progressFill.style.width = '0%';
         
         try {
             let bookmarks;
+            const isJson = file.name.toLowerCase().endsWith('.json');
             
-            if (file.name.endsWith('.json')) {
+            if (progressText) progressText.textContent = isJson ? 'Procesando JSON...' : 'Procesando HTML...';
+            
+            if (isJson) {
                 bookmarks = await bookmarkParser.parseFromJSON(file);
             } else {
                 bookmarks = await bookmarkParser.parseHTML(file);
             }
             
-            if (progressText) progressText.textContent = `Analizando ${bookmarks.length} marcadores...`;
+            if (!bookmarks || bookmarks.length === 0) {
+                throw new Error('No se encontraron marcadores en el archivo');
+            }
+            
+            if (progressText) progressText.textContent = `Guardando ${bookmarks.length} marcadores...`;
             
             let imported = 0;
             for (const bm of bookmarks) {
-                await bookmarkStore.saveBookmark(bm);
-                imported++;
-                if (progressFill) {
-                    progressFill.style.width = `${(imported / bookmarks.length) * 100}%`;
+                try {
+                    await bookmarkStore.saveBookmark(bm);
+                    imported++;
+                } catch (e) {
+                    console.warn('Error guardando bookmark:', e);
                 }
-                await new Promise(r => setTimeout(r, 5));
+                if (progressFill) {
+                    progressFill.style.width = `${Math.round((imported / bookmarks.length) * 100)}%`;
+                }
             }
             
             this.bookmarks = await bookmarkStore.getAllBookmarks();
@@ -761,11 +777,12 @@ const app = {
             this.render();
             
             const topicCount = this.topics.length;
-            this.showToast(`Importados ${imported} marcadores y ${topicCount} temas detectados`, 'success');
+            this.showToast(`Importados ${imported} marcadores${topicCount > 0 ? ` y ${topicCount} temas` : ''}`, 'success');
             this.closeModal('importModal');
+            
         } catch (error) {
             console.error('Import error:', error);
-            this.showToast('Error al importar: ' + error.message, 'error');
+            this.showToast('Error: ' + (error.message || 'No se pudo importar'), 'error');
         } finally {
             if (progress) progress.classList.add('hidden');
             if (progressFill) progressFill.style.width = '0%';
