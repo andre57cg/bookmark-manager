@@ -87,16 +87,8 @@ const bookmarkParser = {
 
     processBookmarks(rawBookmarks) {
         return rawBookmarks.map(raw => {
-            // Primero intentamos detectar desde la URL (más preciso)
-            let type = this.guessTypeFromUrl(raw.url);
-            
-            // Si no detectó tipo, usamos el análisis del título
-            if (type === 'article') {
-                const analysis = autoTagger.analyze(raw.title + ' ' + raw.url);
-                if (analysis.type && analysis.type !== 'article') {
-                    type = analysis.type;
-                }
-            }
+            // Usar el detector de tipos mejorado
+            const type = typeDetector.detectType(raw.url, raw.title);
             
             let createdAt;
             if (raw.addDate) {
