@@ -267,10 +267,35 @@ const autoTagger = {
 };
 
 const defaultRules = [
-    { pattern: /youtube\.com|youtu\.be|vimeo\.com/i, type: 'video' },
-    { pattern: /\.pdf$/i, type: 'pdf' },
-    { pattern: /medium\.com|dev\.to/i, type: 'article' },
-    { pattern: /github\.io|gitlab\.io/i, type: 'blog' },
-    { pattern: /arxiv\.org/i, type: 'pdf', tags: ['research', 'academic'] },
-    { pattern: /breakthrough|state-of-the-art|frontier|latest|2024|2025|2026/i, isVanguard: true }
+    // Videos
+    { pattern: /youtube\.com|youtu\.be|vimeo\.com|dailymotion\.com|twitch\.tv/i, type: 'video' },
+    { pattern: /coursera\.org|udemy\.com.*lecture|edx\.org.*video/i, type: 'video' },
+    
+    // PDFs - extensión directa
+    { pattern: /\.pdf(\?.*)?$/i, type: 'pdf' },
+    
+    // PDFs de fuentes académicas
+    { pattern: /arxiv\.org.*pdf|arxiv\.org\/abs/i, type: 'pdf', tags: ['research', 'academic'] },
+    { pattern: /scholar\.google.*pdf|sciencedirect.*article|springer.*article/i, type: 'pdf', tags: ['research', 'academic'] },
+    { pattern: /ieee.*explore.*pdf|researchgate\.net|academia\.edu/i, type: 'pdf', tags: ['research'] },
+    { pattern: /github\.com.*\.pdf$|raw\.githubusercontent.*\.pdf/i, type: 'pdf' },
+    
+    // Detectar PDF en título
+    { pattern: /\b(pdf|paper|article)\b.*\.(pdf|doc)/i, type: 'pdf' },
+    { pattern: /^(paper|thesis|dissertation).*\.pdf/i, type: 'pdf', tags: ['academic'] },
+    
+    // Blogs y artículos
+    { pattern: /medium\.com|dev\.to|hashnode\.com/i, type: 'article' },
+    { pattern: /blog\.|towardsdatascience\.com/i, type: 'article' },
+    
+    // Blogs personales
+    { pattern: /\.blogspot|\.wordpress\.com|\.wixsite/i, type: 'blog' },
+    
+    // Tutoriales
+    { pattern: /stackoverflow\.com|stackblitz\.com|codepen\.io/i, type: 'tutorial' },
+    { pattern: /docs\.|documentation|wiki/i, type: 'tutorial' },
+    
+    // Vanguardia
+    { pattern: /breakthrough|state-of-the-art|frontier|latest.*research|new.*paper/i, isVanguard: true, tags: ['vanguard'] },
+    { pattern: /2024|2025|2026.*research|recent.*publication/i, isVanguard: true }
 ];

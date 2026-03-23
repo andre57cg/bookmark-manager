@@ -87,8 +87,16 @@ const bookmarkParser = {
 
     processBookmarks(rawBookmarks) {
         return rawBookmarks.map(raw => {
-            const analysis = autoTagger.analyze(raw.title + ' ' + raw.url);
-            const type = analysis.type || this.guessTypeFromUrl(raw.url);
+            // Primero intentamos detectar desde la URL (más preciso)
+            let type = this.guessTypeFromUrl(raw.url);
+            
+            // Si no detectó tipo, usamos el análisis del título
+            if (type === 'article') {
+                const analysis = autoTagger.analyze(raw.title + ' ' + raw.url);
+                if (analysis.type && analysis.type !== 'article') {
+                    type = analysis.type;
+                }
+            }
             
             let createdAt;
             if (raw.addDate) {
@@ -110,8 +118,8 @@ const bookmarkParser = {
                 favicon: this.getFaviconUrl(raw.url),
                 type: type,
                 tags: this.extractKeywords(raw.title, raw.url),
-                topics: analysis.topics,
-                isVanguard: analysis.isVanguard,
+                topics: [],
+                isVanguard: false,
                 createdAt: createdAt,
                 updatedAt: new Date().toISOString(),
                 notes: '',
@@ -124,11 +132,37 @@ const bookmarkParser = {
     guessTypeFromUrl(url) {
         const urlLower = url.toLowerCase();
         
-        if (/\.(pdf)(\?.*)?$/i.test(urlLower)) return 'pdf';
+        // PDFs - extensión .pdf en la URL
+        if (/\.pdf(\?.*)?$/i.test(url)) return 'pdf';
+        
+        // PDFs de Google Scholar y académicas
+        if (/scholar\.google|arxiv\.org.*pdf|sciencedirect|springer.*article|ieee.*explore/i.test(urlLower)) return 'pdf';
+        
+        // PDFs de repositorios académicos
+        if (/researchgate\.net|academia\.edu|ssrn\.com|papers\.ssrn/i.test(urlLower)) return 'pdf';
+        
+        // Videos - plataformas de video
         if (/youtube\.com|youtu\.be|vimeo\.com|dailymotion\.com|twitch\.tv/i.test(urlLower)) return 'video';
-        if (/medium\.com|dev\.to|towardsdatascience\.com|blog\./i.test(urlLower)) return 'article';
-        if (/github\.com\/.*\/releases|download/i.test(urlLower)) return 'pdf';
-        if (/\.md|\.txt|\.rst$/i.test(urlLower)) return 'tutorial';
+        
+        // Videos de cursos
+        if (/coursera\.org|udemy\.com|edx\.org.*videos/i.test(urlLower)) return 'video';
+        
+        // Blogs técnicos
+        if (/medium\.com|dev\.to|hashnode\.com|substack\.com/i.test(urlLower)) return 'article';
+        
+        // Blogs personales
+        if (/\.blogspot|\.wordpress|\.wix|\.medium\//i.test(urlLower)) return 'blog';
+        
+        // Tutoriales y documentación
+        if (/stackoverflow\.com|stackblitz\.com|codepen\.io/i.test(urlLower)) return 'tutorial';
+        if (/docs\.|documentation|wiki|tutorial|guide|how-to/i.test(urlLower)) return 'tutorial';
+        
+        // Archivos de código/documentation
+        if (/\.(md|txt|rst|org)$/i.test(urlLower)) return 'tutorial';
+        if (/readme|changelog|contributing/i.test(urlLower)) return 'tutorial';
+        
+        // Artículos académicos/genéricos
+        if (/article|post|blog|news/i.test(urlLower)) return 'article';
         
         return 'article';
     },
