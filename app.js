@@ -7,59 +7,127 @@ const app = {
     editingBookmark: null,
 
     async init() {
+        console.log('APP: Iniciando...');
         try {
             await bookmarkStore.ensureReady();
+            console.log('APP: BookmarkStore listo');
             await autoTagger.loadRules();
+            console.log('APP: AutoTagger listo');
             await notionExporter.init();
             await obsidianExporter.init();
             
             this.bookmarks = await bookmarkStore.getAllBookmarks();
             this.topics = await bookmarkStore.getAllTopics();
             
+            console.log('APP: Configurando eventos...');
             this.setupEventListeners();
+            console.log('APP: Eventos configurados');
             this.render();
+            console.log('APP: Renderizado completo');
         } catch (error) {
-            console.error('Error al iniciar:', error);
+            console.error('APP: Error:', error);
         }
     },
 
     setupEventListeners() {
-        // Header buttons
-        document.getElementById('importBtn').onclick = () => this.showModal('importModal');
-        document.getElementById('emptyImportBtn').onclick = () => this.showModal('importModal');
-        document.getElementById('exportBtn').onclick = () => this.exportJSON();
-        document.getElementById('settingsBtn').onclick = () => this.showSettings();
-
-        // Sync buttons
-        document.getElementById('notionBtn').onclick = () => this.syncToNotion();
-        document.getElementById('obsidianBtn').onclick = () => this.syncToObsidian();
-
-        // Import options
-        document.getElementById('importFile').onclick = () => this.showImportArea('file');
-        document.getElementById('importPaste').onclick = () => this.showImportArea('paste');
-        document.getElementById('importJson').onclick = () => this.showImportArea('json');
-
-        // File input
-        document.getElementById('fileInput').onchange = (e) => {
-            if (e.target.files?.[0]) this.handleFileImport(e.target.files[0]);
+        const btn = (id, fn) => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.onclick = fn;
+                console.log('APP: Evento configurado en', id);
+            } else {
+                console.warn('APP: Elemento no encontrado:', id);
+            }
         };
 
-        // Drop zone click
-        document.getElementById('dropZone').onclick = () => {
-            document.getElementById('fileInput').click();
-        };
+        btn('importBtn', () => this.showModal('importModal'));
+        btn('emptyImportBtn', () => this.showModal('importModal'));
+        btn('exportBtn', () => this.exportJSON());
+        btn('settingsBtn', () => this.showSettings());
+        btn('notionBtn', () => this.syncToNotion());
+        btn('obsidianBtn', () => this.syncToObsidian());
+        btn('importFile', () => this.showImportArea('file'));
+        btn('importPaste', () => this.showImportArea('paste'));
+        btn('importJson', () => this.showImportArea('json'));
+        btn('dropZone', () => document.getElementById('fileInput')?.click());
+        btn('saveBookmark', () => this.saveBookmarkForm());
+        btn('closeDetail', () => this.hideDetailPanel());
+        btn('editBookmark', () => this.editSelectedBookmark());
+        btn('deleteBookmark', () => this.deleteSelectedBookmark());
+        btn('testNotion', () => this.testNotionConnection());
+        btn('addRule', () => this.addRule());
+        btn('addTopic', () => this.addTopic());
 
-        // Global drag and drop
+        const fileInput = document.getElementById('fileInput');
+        if (fileInput) {
+            fileInput.onchange = (e) => {
+                if (e.target.files?.[0]) this.handleFileImport(e.target.files[0]);
+            };
+        }
+
         document.addEventListener('dragover', (e) => e.preventDefault());
         document.addEventListener('drop', (e) => {
             e.preventDefault();
             if (e.dataTransfer.files?.[0]) this.handleFileImport(e.dataTransfer.files[0]);
         });
 
-        // URL input
-        document.getElementById('urlInput').onkeypress = (e) => {
-            if (e.key === 'Enter') this.addBookmarkFromUrl(e.target.value);
+        const urlInput = document.getElementById('urlInput');
+        if (urlInput) {
+            urlInput.onkeypress = (e) => {
+                if (e.key === 'Enter') this.addBookmarkFromUrl(e.target.value);
+            };
+        }
+
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            searchInput.oninput = (e) => {
+                this.currentFilter.search = e.target.value.toLowerCase();
+                this.renderBookmarks();
+            };
+        }
+
+        const sortSelect = document.getElementById('sortSelect');
+        if (sortSelect) {
+            sortSelect.onchange = () => this.renderBookmarks();
+        }
+
+        document.querySelectorAll('.view-tab').forEach(tab => {
+            tab.onclick = () => {
+                if (tab.dataset.view) this.switchView(tab.dataset.view);
+            };
+        });
+
+        document.querySelectorAll('#typeFilters .sidebar-item').forEach(item => {
+            item.onclick = () => {
+                if (item.dataset.type) this.filterByType(item.dataset.type);
+            };
+        });
+
+        document.querySelectorAll('.modal-close').forEach(btn => {
+            btn.onclick = () => {
+                const modal = btn.closest('.modal');
+                if (modal) this.closeModal(modal.id);
+            };
+        });
+
+        const detailNotes = document.getElementById('detailNotes');
+        if (detailNotes) {
+            detailNotes.onblur = () => this.saveNotes();
+        }
+
+        document.querySelectorAll('.context-item').forEach(item => {
+            item.onclick = () => this.handleContextAction(item.dataset.action);
+        });
+
+        document.onkeydown = (e) => {
+            if (e.key === 'Escape') {
+                this.closeAllModals();
+                this.hideDetailPanel();
+            }
         };
+
+        document.onclick = () => this.hideContextMenu();
+    },
 
         // Search
         document.getElementById('searchInput').oninput = (e) => {

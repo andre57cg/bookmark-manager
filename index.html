@@ -384,5 +384,22 @@
     <script src="notion.js"></script>
     <script src="obsidian.js"></script>
     <script src="app.js"></script>
+    <script>
+        // Test: verificar que app existe y tiene init
+        console.log('TEST: app existe?', typeof app !== 'undefined');
+        console.log('TEST: app.init existe?', typeof app?.init === 'function');
+        
+        // Test: click directo en botón
+        const importBtn = document.getElementById('importBtn');
+        if (importBtn) {
+            console.log('TEST: Botón importar encontrado');
+            importBtn.addEventListener('click', () => {
+                console.log('TEST: Click en importar!');
+                alert('¡Click funcionando!');
+            });
+        } else {
+            console.log('TEST: Botón importar NO encontrado');
+        }
+    </script>
 </body>
 </html>
